@@ -10,9 +10,22 @@
 		CFB540412D753B3F002BAB36 /* Tap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tap.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		CFB5409E2D7545AE002BAB36 /* Exceptions for "Tap" folder in "Tap" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = CFB540402D753B3F002BAB36 /* Tap */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		CFB540432D753B3F002BAB36 /* Tap */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				CFB5409E2D7545AE002BAB36 /* Exceptions for "Tap" folder in "Tap" target */,
+			);
 			path = Tap;
 			sourceTree = "<group>";
 		};
@@ -254,18 +267,18 @@
 				DEVELOPMENT_ASSET_PATHS = "\"Tap/Preview Content\"";
 				DEVELOPMENT_TEAM = RAC3A6G5ZP;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Tap/Info.plist;
+				INFOPLIST_KEY_UILAUNCHSCREEN_Generation = YES;
+				INFOPLIST_KEY_UISUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				INFOPLIST_KEY_UI_APPLICATION_SCENE_MANIFEST_Generation = YES;
+				INFOPLIST_KEY_UI_APPLICATION_SUPPORTS_INDIRECT_INPUT_EVENTS = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "Altantis-Elements.Tap";
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.Tap;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -283,18 +296,18 @@
 				DEVELOPMENT_ASSET_PATHS = "\"Tap/Preview Content\"";
 				DEVELOPMENT_TEAM = RAC3A6G5ZP;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Tap/Info.plist;
+				INFOPLIST_KEY_UILAUNCHSCREEN_Generation = YES;
+				INFOPLIST_KEY_UISUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				INFOPLIST_KEY_UI_APPLICATION_SCENE_MANIFEST_Generation = YES;
+				INFOPLIST_KEY_UI_APPLICATION_SUPPORTS_INDIRECT_INPUT_EVENTS = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "Altantis-Elements.Tap";
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.Tap;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
