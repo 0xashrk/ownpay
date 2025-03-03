@@ -62,6 +62,21 @@ class PrivyService: ObservableObject {
             throw error
         }
     }
+    
+    @MainActor
+    func logout() async {
+        print("Logging out...")
+        do {
+            try await privy.logout()
+            self.authState = .unauthenticated
+            self.otpFlowState = .initial
+            print("Logout successful")
+        } catch {
+            print("Error during logout: \(error)")
+            // Still set to unauthenticated even if logout fails
+            self.authState = .unauthenticated
+        }
+    }
 }
 
 // MARK: - Models

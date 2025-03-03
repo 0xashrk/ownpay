@@ -9,11 +9,13 @@ struct WalletView: View {
         service.startScanning() // Start scanning immediately on initialization
         return service
     }()
+    @StateObject private var privyService = PrivyService.shared
     @Binding var isLoggedIn: Bool
     @State private var showingRequestForm = false
     @State private var amount: String = ""
     @State private var isMerchantMode = false
     @State private var showingPaymentSuccess = false
+    @State private var isLoggingOut = false
     
     // Haptic feedback generators
     private let paymentSuccessGenerator = UINotificationFeedbackGenerator()
@@ -120,19 +122,35 @@ struct WalletView: View {
                 
                 // Logout Button
                 Button(action: {
-                    bleService.disconnect()
-                    bleService.stopScanning()
-                    bleService.stopAdvertising()
-                    isLoggedIn = false
+                    isLoggingOut = true
+                    Task {
+                        // Clean up BLE
+                        bleService.disconnect()
+                        bleService.stopScanning()
+                        bleService.stopAdvertising()
+                        
+                        // Logout from Privy
+                        await privyService.logout()
+                        
+                        // Update login state
+                        isLoggedIn = false
+                        isLoggingOut = false
+                    }
                 }) {
-                    Text("Logout")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.red)
-                        .cornerRadius(10)
+                    if isLoggingOut {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Text("Logout")
+                            .font(.headline)
+                    }
                 }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.red)
+                .cornerRadius(10)
+                .disabled(isLoggingOut)
                 .padding()
             }
             .padding()
@@ -159,6 +177,11 @@ struct WalletView: View {
                 bleService.disconnect()
                 bleService.stopScanning()
                 bleService.stopAdvertising()
+            }
+        }
+        .onReceive(privyService.$authState) { state in
+            if case .unauthenticated = state {
+                isLoggedIn = false
             }
         }
     }
