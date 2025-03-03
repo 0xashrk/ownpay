@@ -135,7 +135,7 @@ struct PaymentRequestCard: View {
             if message.starts(with: "PAYMENT_REQUEST:") {
                 let components = message.split(separator: ":")
                 if components.count >= 3 {
-                    Text("Amount: \(components[1]) ETH")
+                    Text("Amount: \(components[1]) MON")
                         .font(.title2)
                         .bold()
                     Text("From: \(components[2])")
