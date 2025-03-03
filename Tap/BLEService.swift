@@ -83,6 +83,13 @@ class BLEService: NSObject, ObservableObject {
         // Create payment response message
         let message = "PAYMENT_RESPONSE:\(approved ? "APPROVED" : "DECLINED")"
         sendMessage(message)
+        
+        // Clear the payment request from customer's screen if approved
+        if approved {
+            DispatchQueue.main.async {
+                self.receivedMessage = nil
+            }
+        }
     }
     
     private func connect(peripheral: CBPeripheral) {
@@ -284,6 +291,15 @@ extension BLEService: CBPeripheralManagerDelegate {
             if let data = request.value,
                let message = String(data: data, encoding: .utf8) {
                 print("Received write request with message: \(message)")
+                
+                // If it's a payment response and it's approved, clear the request
+                if message.starts(with: "PAYMENT_RESPONSE:") && message.contains("APPROVED") {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        self.receivedMessage = nil
+                        self.stopAdvertising() // Stop advertising since payment is complete
+                    }
+                }
+                
                 DispatchQueue.main.async {
                     self.receivedMessage = message
                 }
