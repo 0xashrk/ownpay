@@ -30,8 +30,22 @@ class PrivyService: ObservableObject {
                     print("PrivyService is now ready")
                 }
                 
-                // When authenticated, create/connect wallet
-                if case .authenticated = state {
+                // Get wallet address from auth session if available
+                if case .authenticated(let session) = state {
+                    if let ethereumWallet = session.user.linkedAccounts.first(where: { account in
+                        if case .embeddedWallet(let wallet) = account {
+                            return wallet.chainType == .ethereum
+                        }
+                        return false
+                    }) {
+                        if case .embeddedWallet(let wallet) = ethereumWallet {
+                            self.walletAddress = wallet.address
+                            self.embeddedWalletState = .connected(wallets: [Wallet(address: wallet.address)])
+                            print("Found wallet from auth session: \(wallet.address)")
+                        }
+                    }
+                    
+                    // Still try to connect wallet in background
                     Task {
                         await self.connectWallet()
                     }
