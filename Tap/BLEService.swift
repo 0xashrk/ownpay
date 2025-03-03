@@ -8,15 +8,20 @@ class BLEService: NSObject, ObservableObject {
     private var connectedPeripheral: CBPeripheral?
     private var characteristic: CBCharacteristic?
     
-    // Service and Characteristic UUIDs
-    private let serviceUUID = CBUUID(string: "180D")
-    private let characteristicUUID = CBUUID(string: "2A37")
+    // Custom service UUID for our app - using a 16-bit UUID
+    private let serviceUUID = CBUUID(string: "FFE0")
+    private let characteristicUUID = CBUUID(string: "FFE1")
     
     @Published var isScanning = false
     @Published var isAdvertising = false
-    @Published var discoveredDevices: [CBPeripheral] = []
-    @Published var connectedDevices: [String] = []
     @Published var receivedMessage: String?
+    @Published var connectionState: ConnectionState = .disconnected
+    
+    enum ConnectionState {
+        case disconnected
+        case connecting
+        case connected
+    }
     
     override init() {
         super.init()
@@ -27,7 +32,8 @@ class BLEService: NSObject, ObservableObject {
     func startScanning() {
         guard centralManager.state == .poweredOn else { return }
         isScanning = true
-        discoveredDevices.removeAll()
+        connectionState = .disconnected
+        // Only scan for devices with our custom service UUID
         centralManager.scanForPeripherals(withServices: [serviceUUID], options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
     }
     
@@ -39,9 +45,10 @@ class BLEService: NSObject, ObservableObject {
     func startAdvertising() {
         guard peripheralManager.state == .poweredOn else { return }
         isAdvertising = true
+        connectionState = .disconnected
         let advertisementData: [String: Any] = [
             CBAdvertisementDataServiceUUIDsKey: [serviceUUID],
-            CBAdvertisementDataLocalNameKey: UIDevice.current.name
+            CBAdvertisementDataLocalNameKey: "Tap Payment"
         ]
         peripheralManager.startAdvertising(advertisementData)
     }
@@ -51,7 +58,21 @@ class BLEService: NSObject, ObservableObject {
         peripheralManager.stopAdvertising()
     }
     
-    func connect(to peripheral: CBPeripheral) {
+    func broadcastPaymentRequest(amount: Double, walletAddress: String) {
+        // Start advertising to make this device discoverable
+        startAdvertising()
+        
+        // Create payment request message
+        let message = "PAYMENT_REQUEST:\(amount):\(walletAddress)"
+        sendMessage(message)
+    }
+    
+    private func connect(peripheral: CBPeripheral) {
+        // Only connect if we're not already connected
+        guard connectionState == .disconnected else { return }
+        
+        connectionState = .connecting
+        connectedPeripheral = peripheral
         centralManager.connect(peripheral, options: nil)
     }
     
@@ -60,6 +81,7 @@ class BLEService: NSObject, ObservableObject {
             centralManager.cancelPeripheralConnection(peripheral)
             connectedPeripheral = nil
             characteristic = nil
+            connectionState = .disconnected
         }
     }
     
@@ -77,45 +99,49 @@ extension BLEService: CBCentralManagerDelegate {
         switch central.state {
         case .poweredOn:
             print("Bluetooth is powered on")
+            // Automatically start scanning when powered on
+            startScanning()
         case .poweredOff:
             print("Bluetooth is powered off")
+            connectionState = .disconnected
         case .resetting:
             print("Bluetooth is resetting")
+            connectionState = .disconnected
         case .unauthorized:
             print("Bluetooth is unauthorized")
+            connectionState = .disconnected
         case .unknown:
             print("Bluetooth state is unknown")
+            connectionState = .disconnected
         case .unsupported:
             print("Bluetooth is not supported")
+            connectionState = .disconnected
         @unknown default:
             print("Unknown Bluetooth state")
+            connectionState = .disconnected
         }
     }
     
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
-        if !discoveredDevices.contains(peripheral) {
-            discoveredDevices.append(peripheral)
+        print("Discovered Tap device")
+        // Only connect if we're not already connected
+        if connectionState == .disconnected {
+            connect(peripheral: peripheral)
         }
     }
     
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        connectedPeripheral = peripheral
+        print("Connected to Tap device")
+        connectionState = .connected
         peripheral.delegate = self
         peripheral.discoverServices([serviceUUID])
-        
-        if let deviceName = peripheral.name {
-            if !connectedDevices.contains(deviceName) {
-                connectedDevices.append(deviceName)
-            }
-        }
     }
     
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        print("Disconnected from Tap device")
+        connectionState = .disconnected
         connectedPeripheral = nil
         characteristic = nil
-        if let deviceName = peripheral.name {
-            connectedDevices.removeAll { $0 == deviceName }
-        }
     }
 }
 
@@ -145,6 +171,7 @@ extension BLEService: CBPeripheralDelegate {
         guard let data = characteristic.value,
               let message = String(data: data, encoding: .utf8) else { return }
         
+        print("Received message: \(message)")
         DispatchQueue.main.async {
             self.receivedMessage = message
         }
@@ -157,18 +184,25 @@ extension BLEService: CBPeripheralManagerDelegate {
         switch peripheral.state {
         case .poweredOn:
             print("Peripheral manager is powered on")
+            setupService()
         case .poweredOff:
             print("Peripheral manager is powered off")
+            connectionState = .disconnected
         case .resetting:
             print("Peripheral manager is resetting")
+            connectionState = .disconnected
         case .unauthorized:
             print("Peripheral manager is unauthorized")
+            connectionState = .disconnected
         case .unknown:
             print("Peripheral manager state is unknown")
+            connectionState = .disconnected
         case .unsupported:
             print("Peripheral manager is not supported")
+            connectionState = .disconnected
         @unknown default:
             print("Unknown peripheral manager state")
+            connectionState = .disconnected
         }
     }
     
@@ -176,11 +210,31 @@ extension BLEService: CBPeripheralManagerDelegate {
         for request in requests {
             if let data = request.value,
                let message = String(data: data, encoding: .utf8) {
+                print("Received write request with message: \(message)")
                 DispatchQueue.main.async {
                     self.receivedMessage = message
                 }
             }
             peripheral.respond(to: request, withResult: .success)
         }
+    }
+    
+    private func setupService() {
+        // Create the service
+        let service = CBMutableService(type: serviceUUID, primary: true)
+        
+        // Create the characteristic
+        let characteristic = CBMutableCharacteristic(
+            type: characteristicUUID,
+            properties: [.write, .notify],
+            value: nil,
+            permissions: [.writeable]
+        )
+        
+        // Add the characteristic to the service
+        service.characteristics = [characteristic]
+        
+        // Add the service to the peripheral manager
+        peripheralManager.add(service)
     }
 } 
