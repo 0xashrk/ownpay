@@ -190,12 +190,14 @@ class PrivyService: ObservableObject {
     func fetchBalance() async {
         guard case .connected(let wallets) = privy.embeddedWallet.embeddedWalletState else {
             print("Cannot fetch balance: Wallet not connected")
+            balance = "0.0000 ETH"  // Set default balance when not connected
             return
         }
         
         // Find an Ethereum wallet
         guard let wallet = wallets.first, wallet.chainType == .ethereum else {
             print("Cannot fetch balance: No Ethereum wallets available")
+            balance = "0.0000 ETH"  // Set default balance when no wallet
             return
         }
         
@@ -222,11 +224,15 @@ class PrivyService: ObservableObject {
                     let ethBalance = Double(balanceDecimal) / 1e18
                     balance = String(format: "%.4f ETH", ethBalance)
                     print("Updated balance: \(balance ?? "nil")")
+                } else {
+                    balance = "0.0000 ETH"  // Set zero balance if parsing fails
                 }
+            } else {
+                balance = "0.0000 ETH"  // Set zero balance if response is not a string
             }
         } catch {
             print("Error fetching balance: \(error)")
-            balance = "Error"
+            balance = "0.0000 ETH"  // Set zero balance on error
         }
     }
 }
