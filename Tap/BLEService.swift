@@ -8,6 +8,7 @@ class BLEService: NSObject, ObservableObject {
     private var connectedPeripheral: CBPeripheral?
     private var characteristic: CBCharacteristic?
     private var pendingPaymentRequest: String?
+    private var shouldStartScanningWhenReady = false
     
     // Custom service UUID for our app - using a 16-bit UUID
     private let serviceUUID = CBUUID(string: "FFE0")
@@ -28,14 +29,19 @@ class BLEService: NSObject, ObservableObject {
         super.init()
         centralManager = CBCentralManager(delegate: self, queue: nil)
         peripheralManager = CBPeripheralManager(delegate: self, queue: nil)
+        shouldStartScanningWhenReady = true // Set to start scanning when Bluetooth is ready
     }
     
     func startScanning() {
-        guard centralManager.state == .poweredOn else { return }
-        isScanning = true
-        connectionState = .disconnected
-        // Only scan for devices with our service UUID
-        centralManager.scanForPeripherals(withServices: [serviceUUID], options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
+        if centralManager.state == .poweredOn {
+            print("Starting scan immediately")
+            isScanning = true
+            connectionState = .disconnected
+            centralManager.scanForPeripherals(withServices: [serviceUUID], options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
+        } else {
+            print("Will start scanning when Bluetooth is ready")
+            shouldStartScanningWhenReady = true
+        }
     }
     
     func stopScanning() {
@@ -149,25 +155,34 @@ extension BLEService: CBCentralManagerDelegate {
         switch central.state {
         case .poweredOn:
             print("Bluetooth is powered on")
-            // Don't start scanning automatically
+            if shouldStartScanningWhenReady {
+                print("Starting delayed scan")
+                startScanning()
+            }
         case .poweredOff:
             print("Bluetooth is powered off")
             connectionState = .disconnected
+            isScanning = false
         case .resetting:
             print("Bluetooth is resetting")
             connectionState = .disconnected
+            isScanning = false
         case .unauthorized:
             print("Bluetooth is unauthorized")
             connectionState = .disconnected
+            isScanning = false
         case .unknown:
             print("Bluetooth state is unknown")
             connectionState = .disconnected
+            isScanning = false
         case .unsupported:
             print("Bluetooth is not supported")
             connectionState = .disconnected
+            isScanning = false
         @unknown default:
             print("Unknown Bluetooth state")
             connectionState = .disconnected
+            isScanning = false
         }
     }
     

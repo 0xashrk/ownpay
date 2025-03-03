@@ -2,7 +2,11 @@ import SwiftUI
 import CoreBluetooth
 
 struct WalletView: View {
-    @StateObject private var bleService = BLEService()
+    @StateObject private var bleService: BLEService = {
+        let service = BLEService()
+        service.startScanning() // Start scanning immediately on initialization
+        return service
+    }()
     @Binding var isLoggedIn: Bool
     @State private var showingRequestForm = false
     @State private var amount: String = ""
@@ -52,7 +56,7 @@ struct WalletView: View {
                     .padding(.horizontal)
                 } else {
                     // Customer View - shows status
-                    Text(bleService.isScanning ? "Scanning for payment requests..." : "Ready to pay")
+                    Text("Scanning for payment requests...")
                         .foregroundColor(.secondary)
                         .padding(.top)
                 }
@@ -102,15 +106,18 @@ struct WalletView: View {
                 if newValue {
                     // Merchant mode: stop scanning
                     bleService.stopScanning()
+                    bleService.stopAdvertising() // Stop any previous advertising
                 } else {
                     // Customer mode: start scanning, stop advertising
                     bleService.stopAdvertising()
                     bleService.startScanning()
                 }
             }
-            .onAppear {
-                // Start in customer mode by default
-                bleService.startScanning()
+            .onDisappear {
+                // Clean up when view disappears
+                bleService.disconnect()
+                bleService.stopScanning()
+                bleService.stopAdvertising()
             }
         }
     }
@@ -202,7 +209,7 @@ struct RequestPaymentForm: View {
         NavigationView {
             Form {
                 Section(header: Text("Request Amount")) {
-                    TextField("Amount (ETH)", text: $amount)
+                    TextField("Amount (MON)", text: $amount)
                         .keyboardType(.decimalPad)
                 }
             }
