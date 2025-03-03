@@ -5,12 +5,28 @@ struct WalletView: View {
     @State private var messageText = ""
     @State private var showMessageInput = false
     @State private var showDeviceList = false
+    @Binding var isLoggedIn: Bool
     
     var body: some View {
         VStack(spacing: 30) {
-            Text("Your Wallet")
-                .font(.largeTitle)
-                .fontWeight(.bold)
+            HStack {
+                Text("Your Wallet")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                
+                Spacer()
+                
+                Button(action: {
+                    bleService.disconnect()
+                    bleService.stopAdvertising()
+                    bleService.stopScanning()
+                    isLoggedIn = false
+                }) {
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                        .font(.system(size: 20))
+                        .foregroundColor(.red)
+                }
+            }
             
             HStack(spacing: 20) {
                 Button(action: {
@@ -160,5 +176,5 @@ struct MessageInputView: View {
 }
 
 #Preview {
-    WalletView()
+    WalletView(isLoggedIn: .constant(true))
 } 
