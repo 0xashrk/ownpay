@@ -7,6 +7,7 @@ class BLEService: NSObject, ObservableObject {
     private var peripheralManager: CBPeripheralManager!
     private var connectedPeripheral: CBPeripheral?
     private var characteristic: CBCharacteristic?
+    private var pendingPaymentRequest: String?
     
     // Custom service UUID for our app - using a 16-bit UUID
     private let serviceUUID = CBUUID(string: "FFE0")
@@ -33,7 +34,7 @@ class BLEService: NSObject, ObservableObject {
         guard centralManager.state == .poweredOn else { return }
         isScanning = true
         connectionState = .disconnected
-        // Only scan for devices with our custom service UUID
+        // Only scan for devices with our service UUID
         centralManager.scanForPeripherals(withServices: [serviceUUID], options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
     }
     
@@ -46,6 +47,10 @@ class BLEService: NSObject, ObservableObject {
         guard peripheralManager.state == .poweredOn else { return }
         isAdvertising = true
         connectionState = .disconnected
+        
+        // Create the service if not already created
+        setupService()
+        
         let advertisementData: [String: Any] = [
             CBAdvertisementDataServiceUUIDsKey: [serviceUUID],
             CBAdvertisementDataLocalNameKey: "Tap Payment"
@@ -56,14 +61,21 @@ class BLEService: NSObject, ObservableObject {
     func stopAdvertising() {
         isAdvertising = false
         peripheralManager.stopAdvertising()
+        pendingPaymentRequest = nil
     }
     
     func broadcastPaymentRequest(amount: Double, walletAddress: String) {
-        // Start advertising to make this device discoverable
-        startAdvertising()
-        
         // Create payment request message
         let message = "PAYMENT_REQUEST:\(amount):\(walletAddress)"
+        pendingPaymentRequest = message
+        
+        // Start advertising to make this device discoverable
+        startAdvertising()
+    }
+    
+    func sendPaymentResponse(approved: Bool) {
+        // Create payment response message
+        let message = "PAYMENT_RESPONSE:\(approved ? "APPROVED" : "DECLINED")"
         sendMessage(message)
     }
     
@@ -71,6 +83,7 @@ class BLEService: NSObject, ObservableObject {
         // Only connect if we're not already connected
         guard connectionState == .disconnected else { return }
         
+        print("Attempting to connect to peripheral: \(peripheral.name ?? "Unknown")")
         connectionState = .connecting
         connectedPeripheral = peripheral
         centralManager.connect(peripheral, options: nil)
@@ -83,13 +96,50 @@ class BLEService: NSObject, ObservableObject {
             characteristic = nil
             connectionState = .disconnected
         }
+        stopAdvertising()
+        stopScanning()
+        pendingPaymentRequest = nil
     }
     
-    func sendMessage(_ message: String) {
-        guard let characteristic = characteristic,
-              let data = message.data(using: .utf8) else { return }
+    private func sendMessage(_ message: String) {
+        guard let data = message.data(using: .utf8) else { return }
         
-        connectedPeripheral?.writeValue(data, for: characteristic, type: .withResponse)
+        if let characteristic = characteristic {
+            // If we have a characteristic, we're the central (customer)
+            connectedPeripheral?.writeValue(data, for: characteristic, type: .withResponse)
+        } else {
+            // If we don't have a characteristic, we're the peripheral (merchant)
+            // Update value and notify subscribers
+            peripheralManager.updateValue(data, for: self.peripheralCharacteristic, onSubscribedCentrals: nil)
+        }
+    }
+    
+    private var peripheralCharacteristic: CBMutableCharacteristic!
+    
+    private func setupService() {
+        // Create the service
+        let service = CBMutableService(type: serviceUUID, primary: true)
+        
+        // Create the characteristic
+        peripheralCharacteristic = CBMutableCharacteristic(
+            type: characteristicUUID,
+            properties: [.write, .notify, .read],
+            value: nil,
+            permissions: [.writeable, .readable]
+        )
+        
+        // Add the characteristic to the service
+        service.characteristics = [peripheralCharacteristic]
+        
+        // Add the service to the peripheral manager
+        peripheralManager.removeAllServices()
+        peripheralManager.add(service)
+        
+        // If we have a pending payment request, send it
+        if let message = pendingPaymentRequest,
+           let data = message.data(using: .utf8) {
+            peripheralManager.updateValue(data, for: peripheralCharacteristic, onSubscribedCentrals: nil)
+        }
     }
 }
 
@@ -99,8 +149,7 @@ extension BLEService: CBCentralManagerDelegate {
         switch central.state {
         case .poweredOn:
             print("Bluetooth is powered on")
-            // Automatically start scanning when powered on
-            startScanning()
+            // Don't start scanning automatically
         case .poweredOff:
             print("Bluetooth is powered off")
             connectionState = .disconnected
@@ -142,6 +191,11 @@ extension BLEService: CBCentralManagerDelegate {
         connectionState = .disconnected
         connectedPeripheral = nil
         characteristic = nil
+        
+        // If we're still scanning, look for other devices
+        if isScanning {
+            startScanning()
+        }
     }
 }
 
@@ -162,6 +216,8 @@ extension BLEService: CBPeripheralDelegate {
             if characteristic.uuid == characteristicUUID {
                 self.characteristic = characteristic
                 peripheral.setNotifyValue(true, for: characteristic)
+                // Also read the current value
+                peripheral.readValue(for: characteristic)
                 break
             }
         }
@@ -184,7 +240,9 @@ extension BLEService: CBPeripheralManagerDelegate {
         switch peripheral.state {
         case .poweredOn:
             print("Peripheral manager is powered on")
-            setupService()
+            if isAdvertising {
+                setupService()
+            }
         case .poweredOff:
             print("Peripheral manager is powered off")
             connectionState = .disconnected
@@ -219,22 +277,12 @@ extension BLEService: CBPeripheralManagerDelegate {
         }
     }
     
-    private func setupService() {
-        // Create the service
-        let service = CBMutableService(type: serviceUUID, primary: true)
-        
-        // Create the characteristic
-        let characteristic = CBMutableCharacteristic(
-            type: characteristicUUID,
-            properties: [.write, .notify],
-            value: nil,
-            permissions: [.writeable]
-        )
-        
-        // Add the characteristic to the service
-        service.characteristics = [characteristic]
-        
-        // Add the service to the peripheral manager
-        peripheralManager.add(service)
+    func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral, didSubscribeTo characteristic: CBCharacteristic) {
+        print("Central subscribed to characteristic")
+        // Send pending payment request if we have one
+        if let message = pendingPaymentRequest,
+           let data = message.data(using: .utf8) {
+            peripheralManager.updateValue(data, for: peripheralCharacteristic, onSubscribedCentrals: [central])
+        }
     }
 } 
