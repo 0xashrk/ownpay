@@ -8,14 +8,10 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var isLoggedIn = false
+    @State private var isLoggedIn = true // Since we're already logged in when we reach this view
     
     var body: some View {
-        if isLoggedIn {
-            WalletView(isLoggedIn: $isLoggedIn)
-        } else {
-            LoginView(isLoggedIn: $isLoggedIn)
-        }
+        WalletView(isLoggedIn: $isLoggedIn)
     }
 }
 

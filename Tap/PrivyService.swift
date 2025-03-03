@@ -1,67 +1,72 @@
 import Foundation
+import PrivySDK
 
 class PrivyService: ObservableObject {
-    @Published var authState: AuthState = .unauthenticated
-    @Published var otpFlowState: OTPFlowState = .initial
-    private var otpFlowStateCallback: ((OTPFlowState) -> Void)?
+    @Published var authState: PrivySDK.AuthState = .notReady
+    @Published var otpFlowState: PrivySDK.OtpFlowState = .initial
+    @Published var isReady = false
     
     static let shared = PrivyService()
+    private var privy: Privy!
     
     private init() {
-        // Initialize Privy with your app ID from Config
-        let appId = Config.privyAppId
-        // privy.initialize(appId: appId)
+        print("Initializing PrivyService with appId: \(Config.privyAppId)")
+        print("Client ID: \(Config.privyClientId)")
+        
+        let config = PrivyConfig(appId: Config.privyAppId, appClientId: Config.privyClientId)
+        privy = PrivySdk.initialize(config: config)
+        
+        // Set up auth state change callback
+        privy.setAuthStateChangeCallback { [weak self] state in
+            guard let self = self else { return }
+            print("Auth state changed to: \(state)")
+            DispatchQueue.main.async {
+                self.authState = state
+                if !self.isReady && state != .notReady {
+                    self.isReady = true
+                    print("PrivyService is now ready")
+                }
+            }
+        }
+        
+        // Set up OTP flow state callback
+        privy.email.setOtpFlowStateChangeCallback { [weak self] state in
+            guard let self = self else { return }
+            print("OTP flow state changed to: \(state)")
+            DispatchQueue.main.async {
+                self.otpFlowState = state
+            }
+        }
     }
     
     func sendCode(to email: String) async -> Bool {
-        // Simulate sending code for now
-        // Replace with actual Privy implementation
+        print("Attempting to send code to: \(email)")
         do {
-            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay
-            updateOTPFlowState(.awaitingCodeInput)
-            return true
+            let result = await privy.email.sendCode(to: email)
+            print("Send code result: \(result)")
+            return result
         } catch {
-            updateOTPFlowState(.sendCodeFailure(error))
+            print("Error sending code: \(error)")
             return false
         }
     }
     
-    func loginWithCode(_ code: String, sentTo email: String) async throws -> AuthState {
-        // Simulate verification for now
-        // Replace with actual Privy implementation
+    func loginWithCode(_ code: String, sentTo email: String) async throws -> PrivySDK.AuthState {
+        print("Attempting to verify code for: \(email)")
         do {
-            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay
-            
-            // Simulate successful verification
-            if code == "123456" { // For testing purposes
-                let authState = AuthState.authenticated(User(id: "test_user", email: email))
-                self.authState = authState
-                updateOTPFlowState(.done)
-                return authState
-            } else {
-                updateOTPFlowState(.incorrectCode)
-                throw AuthError.invalidCode
-            }
+            let result = try await privy.email.loginWithCode(code, sentTo: email)
+            print("Login result: \(result)")
+            return result
         } catch {
-            updateOTPFlowState(.loginError(error))
+            print("Error verifying code: \(error)")
             throw error
-        }
-    }
-    
-    func setOtpFlowStateChangeCallback(_ callback: @escaping (OTPFlowState) -> Void) {
-        otpFlowStateCallback = callback
-    }
-    
-    private func updateOTPFlowState(_ state: OTPFlowState) {
-        DispatchQueue.main.async {
-            self.otpFlowState = state
-            self.otpFlowStateCallback?(state)
         }
     }
 }
 
 // MARK: - Models
 enum AuthState {
+    case notReady
     case unauthenticated
     case authenticated(User)
 }

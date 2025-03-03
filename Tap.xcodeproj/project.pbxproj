@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		CFB540AD2D75648B002BAB36 /* Privy in Frameworks */ = {isa = PBXBuildFile; productRef = CFB540AC2D75648B002BAB36 /* Privy */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		CFB540412D753B3F002BAB36 /* Tap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tap.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -36,6 +40,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CFB540AD2D75648B002BAB36 /* Privy in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +83,7 @@
 			);
 			name = Tap;
 			packageProductDependencies = (
+				CFB540AC2D75648B002BAB36 /* Privy */,
 			);
 			productName = Tap;
 			productReference = CFB540412D753B3F002BAB36 /* Tap.app */;
@@ -107,6 +113,9 @@
 			);
 			mainGroup = CFB540382D753B3F002BAB36;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				CFB540AB2D75648B002BAB36 /* XCRemoteSwiftPackageReference "privy-ios" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CFB540422D753B3F002BAB36 /* Products */;
 			projectDirPath = "";
@@ -279,7 +288,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.Tap;
+				PRODUCT_BUNDLE_IDENTIFIER = com.own.Tap;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -309,7 +318,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.Tap;
+				PRODUCT_BUNDLE_IDENTIFIER = com.own.Tap;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -339,6 +348,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		CFB540AB2D75648B002BAB36 /* XCRemoteSwiftPackageReference "privy-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/privy-io/privy-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.9.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		CFB540AC2D75648B002BAB36 /* Privy */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CFB540AB2D75648B002BAB36 /* XCRemoteSwiftPackageReference "privy-ios" */;
+			productName = Privy;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = CFB540392D753B3F002BAB36 /* Project object */;
 }

@@ -11,7 +11,7 @@ import SwiftUI
 struct TapApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            LoginView()
         }
     }
 }
