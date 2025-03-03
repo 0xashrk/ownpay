@@ -16,6 +16,7 @@ struct WalletView: View {
     @State private var isMerchantMode = false
     @State private var showingPaymentSuccess = false
     @State private var isLoggingOut = false
+    @State private var logoutError: String?
     
     // Haptic feedback generators
     private let paymentSuccessGenerator = UINotificationFeedbackGenerator()
@@ -24,13 +25,21 @@ struct WalletView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
-                // Balance Section
+                // Wallet Address Section
                 VStack(spacing: 8) {
-                    Text("Balance")
+                    Text("Your Wallet")
                         .font(.headline)
-                    Text("0.1 MON")
-                        .font(.title)
-                        .bold()
+                    if let address = privyService.walletAddress {
+                        Text(address)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    } else {
+                        Text("Connecting wallet...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 .padding()
                 .frame(maxWidth: .infinity)
@@ -123,17 +132,23 @@ struct WalletView: View {
                 // Logout Button
                 Button(action: {
                     isLoggingOut = true
+                    logoutError = nil
                     Task {
-                        // Clean up BLE
-                        bleService.disconnect()
-                        bleService.stopScanning()
-                        bleService.stopAdvertising()
-                        
-                        // Logout from Privy
-                        await privyService.logout()
-                        
-                        // Update login state
-                        isLoggedIn = false
+                        do {
+                            // Clean up BLE
+                            bleService.disconnect()
+                            bleService.stopScanning()
+                            bleService.stopAdvertising()
+                            
+                            // Logout from Privy
+                            try await privyService.logout()
+                            
+                            // Update login state
+                            isLoggedIn = false
+                        } catch {
+                            logoutError = "Failed to logout: \(error.localizedDescription)"
+                            print("Logout error: \(error)")
+                        }
                         isLoggingOut = false
                     }
                 }) {
@@ -152,12 +167,21 @@ struct WalletView: View {
                 .cornerRadius(10)
                 .disabled(isLoggingOut)
                 .padding()
+                
+                if let error = logoutError {
+                    Text(error)
+                        .foregroundColor(.red)
+                        .font(.caption)
+                        .padding(.horizontal)
+                }
             }
             .padding()
             .navigationTitle("Wallet")
             .sheet(isPresented: $showingRequestForm) {
                 RequestPaymentForm(amount: $amount) { amount in
-                    bleService.broadcastPaymentRequest(amount: amount, walletAddress: "YOUR_WALLET_HERE")
+                    if let walletAddress = privyService.walletAddress {
+                        bleService.broadcastPaymentRequest(amount: amount, walletAddress: walletAddress)
+                    }
                     showingRequestForm = false
                 }
             }

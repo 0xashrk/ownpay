@@ -5,9 +5,12 @@ class PrivyService: ObservableObject {
     @Published var authState: PrivySDK.AuthState = .notReady
     @Published var otpFlowState: PrivySDK.OtpFlowState = .initial
     @Published var isReady = false
+    @Published var walletAddress: String?
+    @Published var embeddedWalletState: EmbeddedWalletState = .notConnected
     
     static let shared = PrivyService()
     private var privy: Privy!
+    private var ethereumProvider: EthereumEmbeddedWalletProvider?
     
     private init() {
         print("Initializing PrivyService with appId: \(Config.privyAppId)")
@@ -26,6 +29,13 @@ class PrivyService: ObservableObject {
                     self.isReady = true
                     print("PrivyService is now ready")
                 }
+                
+                // When authenticated, create/connect wallet
+                if case .authenticated = state {
+                    Task {
+                        await self.connectWallet()
+                    }
+                }
             }
         }
         
@@ -41,14 +51,9 @@ class PrivyService: ObservableObject {
     
     func sendCode(to email: String) async -> Bool {
         print("Attempting to send code to: \(email)")
-        do {
-            let result = await privy.email.sendCode(to: email)
-            print("Send code result: \(result)")
-            return result
-        } catch {
-            print("Error sending code: \(error)")
-            return false
-        }
+        let result = await privy.email.sendCode(to: email)
+        print("Send code result: \(result)")
+        return result
     }
     
     func loginWithCode(_ code: String, sentTo email: String) async throws -> PrivySDK.AuthState {
@@ -64,18 +69,59 @@ class PrivyService: ObservableObject {
     }
     
     @MainActor
-    func logout() async {
-        print("Logging out...")
+    func connectWallet() async {
+        print("Connecting wallet...")
         do {
-            try await privy.logout()
-            self.authState = .unauthenticated
-            self.otpFlowState = .initial
-            print("Logout successful")
+            // Get the embedded wallet provider
+            if ethereumProvider == nil {
+                ethereumProvider = try privy.embeddedWallet.getEthereumProvider(for: "ethereum")
+            }
+            
+            guard let provider = ethereumProvider else {
+                throw WalletError.providerNotInitialized
+            }
+            
+            // Create a new wallet if needed
+            let request = RpcRequest(method: "eth_accounts", params: [])
+            let response = try await provider.request(request)
+            
+            if let accounts = response as? [String], let address = accounts.first {
+                // Wallet exists, update state
+                self.walletAddress = address
+                self.embeddedWalletState = .connected(wallets: [Wallet(address: address)])
+                print("Found existing wallet: \(address)")
+            } else {
+                // Create a new wallet
+                print("No existing wallet found, creating new one...")
+                let createRequest = RpcRequest(method: "eth_requestAccounts", params: [])
+                let createResponse = try await provider.request(createRequest)
+                
+                if let newAccounts = createResponse as? [String], let newAddress = newAccounts.first {
+                    self.walletAddress = newAddress
+                    self.embeddedWalletState = .connected(wallets: [Wallet(address: newAddress)])
+                    print("Created new wallet: \(newAddress)")
+                } else {
+                    throw WalletError.creationFailed
+                }
+            }
         } catch {
-            print("Error during logout: \(error)")
-            // Still set to unauthenticated even if logout fails
-            self.authState = .unauthenticated
+            print("Error with wallet operation: \(error)")
+            self.embeddedWalletState = .notConnected
+            self.ethereumProvider = nil
         }
+    }
+    
+    @MainActor
+    func logout() async throws {
+        print("Logging out...")
+        self.ethereumProvider = nil
+        try await privy.logout()
+        
+        self.authState = .unauthenticated
+        self.otpFlowState = .initial
+        self.walletAddress = nil
+        self.embeddedWalletState = .notConnected
+        print("Logout successful")
     }
 }
 
@@ -97,6 +143,11 @@ enum AuthError: Error {
     case unknown
 }
 
+enum WalletError: Error {
+    case creationFailed
+    case providerNotInitialized
+}
+
 enum OTPFlowState {
     case initial
     case sourceNotSpecified
@@ -107,4 +158,14 @@ enum OTPFlowState {
     case incorrectCode
     case loginError(Error)
     case done
+}
+
+enum EmbeddedWalletState {
+    case notConnected
+    case connecting
+    case connected(wallets: [Wallet])
+}
+
+struct Wallet {
+    let address: String
 } 
