@@ -1,5 +1,7 @@
 import SwiftUI
 import CoreBluetooth
+import AVFoundation
+import UIKit
 
 struct WalletView: View {
     @StateObject private var bleService: BLEService = {
@@ -11,6 +13,11 @@ struct WalletView: View {
     @State private var showingRequestForm = false
     @State private var amount: String = ""
     @State private var isMerchantMode = false
+    @State private var showingPaymentSuccess = false
+    
+    // Haptic feedback generators
+    private let paymentSuccessGenerator = UINotificationFeedbackGenerator()
+    private let selectionGenerator = UISelectionFeedbackGenerator()
     
     var body: some View {
         NavigationView {
@@ -28,17 +35,21 @@ struct WalletView: View {
                 .background(Color.blue.opacity(0.1))
                 .cornerRadius(10)
                 
-                // Mode Toggle
+                // Mode Toggle with haptic
                 Picker("Mode", selection: $isMerchantMode) {
                     Text("Customer").tag(false)
                     Text("Merchant").tag(true)
                 }
                 .pickerStyle(SegmentedPickerStyle())
                 .padding(.horizontal)
+                .onChange(of: isMerchantMode) { _ in
+                    selectionGenerator.selectionChanged()
+                }
                 
                 if isMerchantMode {
                     // Merchant View
                     Button(action: {
+                        selectionGenerator.selectionChanged()
                         showingRequestForm = true
                     }) {
                         HStack {
@@ -63,8 +74,30 @@ struct WalletView: View {
                 
                 // Payment Requests (visible to customer)
                 if !isMerchantMode, let message = bleService.receivedMessage {
-                    PaymentRequestCard(message: message, bleService: bleService)
-                        .padding(.horizontal)
+                    PaymentRequestCard(message: message, bleService: bleService, onPaymentAction: { approved in
+                        if approved {
+                            playPaymentSound()
+                            paymentSuccessGenerator.notificationOccurred(.success)
+                            withAnimation {
+                                showingPaymentSuccess = true
+                            }
+                            // Hide success message after 2 seconds
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                withAnimation {
+                                    showingPaymentSuccess = false
+                                }
+                            }
+                        } else {
+                            paymentSuccessGenerator.notificationOccurred(.error)
+                        }
+                    })
+                    .padding(.horizontal)
+                }
+                
+                // Success overlay
+                if showingPaymentSuccess {
+                    PaymentSuccessView()
+                        .transition(.scale.combined(with: .opacity))
                 }
                 
                 // Payment Responses (visible to merchant)
@@ -72,6 +105,14 @@ struct WalletView: View {
                     if message.starts(with: "PAYMENT_RESPONSE:") {
                         PaymentResponseCard(message: message)
                             .padding(.horizontal)
+                            .onAppear {
+                                if message.contains("APPROVED") {
+                                    playPaymentSound()
+                                    paymentSuccessGenerator.notificationOccurred(.success)
+                                } else {
+                                    paymentSuccessGenerator.notificationOccurred(.error)
+                                }
+                            }
                     }
                 }
                 
@@ -121,11 +162,16 @@ struct WalletView: View {
             }
         }
     }
+    
+    private func playPaymentSound() {
+        AudioServicesPlaySystemSound(1407) // This is Apple Pay's success sound
+    }
 }
 
 struct PaymentRequestCard: View {
     let message: String
     let bleService: BLEService
+    let onPaymentAction: (Bool) -> Void
     
     var body: some View {
         VStack(spacing: 12) {
@@ -145,6 +191,7 @@ struct PaymentRequestCard: View {
                     HStack(spacing: 20) {
                         Button(action: {
                             bleService.sendPaymentResponse(approved: false)
+                            onPaymentAction(false)
                         }) {
                             Text("Decline")
                                 .foregroundColor(.red)
@@ -156,6 +203,7 @@ struct PaymentRequestCard: View {
                         
                         Button(action: {
                             bleService.sendPaymentResponse(approved: true)
+                            onPaymentAction(true)
                         }) {
                             Text("Pay")
                                 .foregroundColor(.white)
@@ -197,6 +245,22 @@ struct PaymentResponseCard: View {
         .frame(maxWidth: .infinity)
         .background(Color.gray.opacity(0.1))
         .cornerRadius(10)
+    }
+}
+
+struct PaymentSuccessView: View {
+    var body: some View {
+        VStack {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 60))
+                .foregroundColor(.green)
+            Text("Payment Sent!")
+                .font(.title2)
+                .bold()
+        }
+        .padding(30)
+        .background(.ultraThinMaterial)
+        .cornerRadius(20)
     }
 }
 
