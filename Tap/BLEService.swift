@@ -1,5 +1,6 @@
 import Foundation
 import CoreBluetooth
+import UIKit
 
 class BLEService: NSObject, ObservableObject {
     private var centralManager: CBCentralManager!
@@ -13,7 +14,9 @@ class BLEService: NSObject, ObservableObject {
     
     @Published var isScanning = false
     @Published var isAdvertising = false
+    @Published var discoveredDevices: [CBPeripheral] = []
     @Published var connectedDevices: [String] = []
+    @Published var receivedMessage: String?
     
     override init() {
         super.init()
@@ -24,7 +27,8 @@ class BLEService: NSObject, ObservableObject {
     func startScanning() {
         guard centralManager.state == .poweredOn else { return }
         isScanning = true
-        centralManager.scanForPeripherals(withServices: [serviceUUID])
+        discoveredDevices.removeAll()
+        centralManager.scanForPeripherals(withServices: [serviceUUID], options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
     }
     
     func stopScanning() {
@@ -36,7 +40,8 @@ class BLEService: NSObject, ObservableObject {
         guard peripheralManager.state == .poweredOn else { return }
         isAdvertising = true
         let advertisementData: [String: Any] = [
-            CBAdvertisementDataServiceUUIDsKey: [serviceUUID]
+            CBAdvertisementDataServiceUUIDsKey: [serviceUUID],
+            CBAdvertisementDataLocalNameKey: UIDevice.current.name
         ]
         peripheralManager.startAdvertising(advertisementData)
     }
@@ -44,6 +49,18 @@ class BLEService: NSObject, ObservableObject {
     func stopAdvertising() {
         isAdvertising = false
         peripheralManager.stopAdvertising()
+    }
+    
+    func connect(to peripheral: CBPeripheral) {
+        centralManager.connect(peripheral, options: nil)
+    }
+    
+    func disconnect() {
+        if let peripheral = connectedPeripheral {
+            centralManager.cancelPeripheralConnection(peripheral)
+            connectedPeripheral = nil
+            characteristic = nil
+        }
     }
     
     func sendMessage(_ message: String) {
@@ -76,10 +93,8 @@ extension BLEService: CBCentralManagerDelegate {
     }
     
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
-        if let deviceName = peripheral.name {
-            if !connectedDevices.contains(deviceName) {
-                connectedDevices.append(deviceName)
-            }
+        if !discoveredDevices.contains(peripheral) {
+            discoveredDevices.append(peripheral)
         }
     }
     
@@ -87,6 +102,20 @@ extension BLEService: CBCentralManagerDelegate {
         connectedPeripheral = peripheral
         peripheral.delegate = self
         peripheral.discoverServices([serviceUUID])
+        
+        if let deviceName = peripheral.name {
+            if !connectedDevices.contains(deviceName) {
+                connectedDevices.append(deviceName)
+            }
+        }
+    }
+    
+    func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        connectedPeripheral = nil
+        characteristic = nil
+        if let deviceName = peripheral.name {
+            connectedDevices.removeAll { $0 == deviceName }
+        }
     }
 }
 
@@ -106,8 +135,18 @@ extension BLEService: CBPeripheralDelegate {
         for characteristic in characteristics {
             if characteristic.uuid == characteristicUUID {
                 self.characteristic = characteristic
+                peripheral.setNotifyValue(true, for: characteristic)
                 break
             }
+        }
+    }
+    
+    func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
+        guard let data = characteristic.value,
+              let message = String(data: data, encoding: .utf8) else { return }
+        
+        DispatchQueue.main.async {
+            self.receivedMessage = message
         }
     }
 }
@@ -137,8 +176,9 @@ extension BLEService: CBPeripheralManagerDelegate {
         for request in requests {
             if let data = request.value,
                let message = String(data: data, encoding: .utf8) {
-                print("Received message: \(message)")
-                // Handle received message here
+                DispatchQueue.main.async {
+                    self.receivedMessage = message
+                }
             }
             peripheral.respond(to: request, withResult: .success)
         }

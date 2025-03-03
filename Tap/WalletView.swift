@@ -4,6 +4,7 @@ struct WalletView: View {
     @StateObject private var bleService = BLEService()
     @State private var messageText = ""
     @State private var showMessageInput = false
+    @State private var showDeviceList = false
     
     var body: some View {
         VStack(spacing: 30) {
@@ -13,7 +14,8 @@ struct WalletView: View {
             
             HStack(spacing: 20) {
                 Button(action: {
-                    showMessageInput = true
+                    showDeviceList = true
+                    bleService.startScanning()
                 }) {
                     VStack {
                         Image(systemName: "arrow.up.circle.fill")
@@ -55,6 +57,21 @@ struct WalletView: View {
                     .foregroundColor(.green)
             }
             
+            if bleService.isScanning {
+                Text("Scanning for devices...")
+                    .foregroundColor(.blue)
+            }
+            
+            if let receivedMessage = bleService.receivedMessage {
+                VStack {
+                    Text("Received Message:")
+                        .font(.headline)
+                    Text(receivedMessage)
+                        .foregroundColor(.green)
+                }
+                .padding()
+            }
+            
             if !bleService.connectedDevices.isEmpty {
                 VStack(alignment: .leading) {
                     Text("Connected Devices:")
@@ -70,6 +87,37 @@ struct WalletView: View {
         .padding()
         .sheet(isPresented: $showMessageInput) {
             MessageInputView(bleService: bleService, messageText: $messageText)
+        }
+        .sheet(isPresented: $showDeviceList) {
+            DeviceListView(bleService: bleService, isPresented: $showDeviceList)
+        }
+    }
+}
+
+struct DeviceListView: View {
+    @ObservedObject var bleService: BLEService
+    @Binding var isPresented: Bool
+    
+    var body: some View {
+        NavigationView {
+            List(bleService.discoveredDevices, id: \.identifier) { device in
+                Button(action: {
+                    bleService.connect(to: device)
+                    isPresented = false
+                }) {
+                    HStack {
+                        Text(device.name ?? "Unknown Device")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.gray)
+                    }
+                }
+            }
+            .navigationTitle("Available Devices")
+            .navigationBarItems(trailing: Button("Cancel") {
+                bleService.stopScanning()
+                isPresented = false
+            })
         }
     }
 }
