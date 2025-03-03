@@ -30,11 +30,23 @@ struct WalletView: View {
                     Text("Your Wallet")
                         .font(.headline)
                     if let address = privyService.walletAddress {
-                        Text(address)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
+                        VStack(spacing: 4) {
+                            Text(address)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            
+                            if let balance = privyService.balance {
+                                Text(balance)
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                            } else {
+                                Text("Fetching balance...")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
                     } else {
                         Text("Connecting wallet...")
                             .font(.caption)
@@ -45,6 +57,24 @@ struct WalletView: View {
                 .frame(maxWidth: .infinity)
                 .background(Color.blue.opacity(0.1))
                 .cornerRadius(10)
+                .task {
+                    // Ensure wallet is connected before fetching balance
+                    if privyService.walletAddress != nil {
+                        if case .notConnected = privyService.embeddedWalletState {
+                            print("Connecting wallet before fetching balance...")
+                            await privyService.connectWallet()
+                        }
+                        await privyService.fetchBalance()
+                    }
+                }
+                .refreshable {
+                    // Ensure wallet is connected on manual refresh
+                    if case .notConnected = privyService.embeddedWalletState {
+                        print("Connecting wallet before refreshing balance...")
+                        await privyService.connectWallet()
+                    }
+                    await privyService.fetchBalance()
+                }
                 
                 // Mode Toggle with haptic
                 Picker("Mode", selection: $isMerchantMode) {
