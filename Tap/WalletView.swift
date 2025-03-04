@@ -12,7 +12,7 @@ struct WalletView: View {
     @StateObject private var privyService = PrivyService.shared
     @Binding var isLoggedIn: Bool
     @State private var showingRequestForm = false
-    @State private var amount: String = ""
+    @State private var amount: String = "1" // Default to 1 MON
     @State private var isMerchantMode = false
     @State private var showingPaymentSuccess = false
     @State private var isLoggingOut = false
@@ -165,7 +165,7 @@ struct WalletView: View {
                     logoutError = nil
                     Task {
                         do {
-                            // Clean up BLE
+                            // Clean up communication services
                             bleService.disconnect()
                             bleService.stopScanning()
                             bleService.stopAdvertising()
@@ -345,6 +345,17 @@ struct RequestPaymentForm: View {
     @Binding var amount: String
     let onRequest: (Double) -> Void
     @Environment(\.dismiss) var dismiss
+    
+    init(amount: Binding<String>, onRequest: @escaping (Double) -> Void) {
+        self._amount = amount
+        self.onRequest = onRequest
+        // Set default amount to "1"
+        if amount.wrappedValue.isEmpty {
+            DispatchQueue.main.async {
+                amount.wrappedValue = "1"
+            }
+        }
+    }
     
     var body: some View {
         NavigationView {
