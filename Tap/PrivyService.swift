@@ -7,6 +7,7 @@ class PrivyService: ObservableObject {
     @Published var isReady = false
     @Published var walletAddress: String?
     @Published var balance: String?
+    @Published var monBalance: String?
     @Published var embeddedWalletState: EmbeddedWalletState = .notConnected
     @Published private var isWalletOperationInProgress = false
     
@@ -14,8 +15,11 @@ class PrivyService: ObservableObject {
     private var privy: Privy!
     private var ethereumProvider: EthereumEmbeddedWalletProvider?
     
-    // Add Sepolia RPC URL
-    private let sepoliaRPCURL = "https://sepolia.infura.io/v3/6776e581d8a64e198dbf80b920c6d2ae" // Replace with your Infura/Alchemy project ID
+    // Update RPC URL to Monad testnet
+    private let monadRPCURL = "https://testnet-rpc.monad.xyz"
+    
+    // Add MON token contract address for Monad testnet
+    private let monTokenAddress = "0xB5a30b0FDc5EA94A52fDc42e3E9760Cb8449Fb37" // Replace with actual MON token address
     
     private init() {
         print("Initializing PrivyService with appId: \(Config.privyAppId)")
@@ -194,33 +198,53 @@ class PrivyService: ObservableObject {
         guard let address = walletAddress else { return }
         
         do {
-            let url = URL(string: sepoliaRPCURL)!
+            print("Fetching balance for address: \(address)")
+            // Fetch native token balance
+            let url = URL(string: monadRPCURL)!
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             
-            let jsonBody: [String: Any] = [
+            // Get native token balance
+            let nativeBalanceJson: [String: Any] = [
                 "jsonrpc": "2.0",
                 "method": "eth_getBalance",
                 "params": [address, "latest"],
                 "id": 1
             ]
             
-            request.httpBody = try JSONSerialization.data(withJSONObject: jsonBody)
-            
+            print("Sending request with JSON: \(nativeBalanceJson)")
+            request.httpBody = try JSONSerialization.data(withJSONObject: nativeBalanceJson)
             let (data, _) = try await URLSession.shared.data(for: request)
+            let responseString = String(data: data, encoding: .utf8) ?? "Could not decode response"
+            print("Received response: \(responseString)")
+            
             let response = try JSONDecoder().decode(JSONRPCResponse.self, from: data)
             
-            // Convert hex balance to ETH
+            // Convert hex balance to MON (since we're on Monad testnet)
             let balanceHex = response.result
-            let balance = Double(Int(balanceHex.dropFirst(2), radix: 16) ?? 0) / 1e18
+            print("Raw balance hex: \(balanceHex)")
+            
+            // Remove "0x" prefix and convert to decimal using UInt64
+            let hexString = balanceHex.dropFirst(2)
+            let balance = Double(UInt64(hexString, radix: 16) ?? 0) / 1e18
+            print("Converted balance: \(balance) MON")
+            
             await MainActor.run {
-                self.balance = String(format: "%.4f ETH", balance)
+                self.balance = String(format: "%.4f MON", balance)
+            }
+            
+            // Since we're on Monad testnet, we don't need to fetch MON token balance separately
+            // as MON is the native token
+            await MainActor.run {
+                self.monBalance = nil // Clear MON balance since it's the same as native balance
             }
         } catch {
             print("Error fetching balance: \(error)")
+            print("Error details: \(String(describing: error))")
             await MainActor.run {
                 self.balance = "Error"
+                self.monBalance = nil
             }
         }
     }
