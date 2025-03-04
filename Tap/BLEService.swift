@@ -23,9 +23,14 @@ class BLEService: NSObject, ObservableObject {
     @Published var connectionState: ConnectionState = .disconnected
     @Published var isInRange = false // New property to track if device is in tap range
     
-    // RSSI thresholds
-    private let rssiThresholdForConnection: Int = -55  // Much more lenient, ~20cm
-    private let rssiThresholdForHaptic: Int = -65     // Start haptic feedback earlier
+    // RSSI thresholds and filtering
+    private let rssiThresholdForConnection: Int = -20  // Ultra strict, requires almost physical contact
+    private let rssiThresholdForHaptic: Int = -25     // Start haptic feedback at ~2cm
+    private var lastValidRSSI: Int = -100             // Store last valid RSSI
+    private let rssiSmoothingFactor: Double = 0.15    // More aggressive smoothing
+    private let invalidRSSI: Int = 127                // Special value indicating invalid RSSI
+    private var consecutiveValidReadings: Int = 0     // Count of consistent readings
+    private let requiredConsistentReadings: Int = 3   // Number of consistent readings required
     
     enum ConnectionState {
         case disconnected
@@ -104,10 +109,21 @@ class BLEService: NSObject, ObservableObject {
         let message = "PAYMENT_RESPONSE:\(approved ? "APPROVED" : "DECLINED")"
         sendMessage(message)
         
-        // Clear the payment request from customer's screen if approved
-        if approved {
-            DispatchQueue.main.async {
-                self.receivedMessage = nil
+        // Clear state and restart scanning for new requests
+        DispatchQueue.main.async {
+            print("Payment response sent, cleaning up...")
+            self.receivedMessage = nil
+            
+            // Force a proper cleanup and restart
+            self.disconnect()
+            self.stopScanning()
+            self.characteristic = nil
+            self.connectionState = .disconnected
+            
+            // Ensure we're in a clean state before restarting scan
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                print("Restarting scan for new payment requests...")
+                self.startScanning()
             }
         }
     }
@@ -214,22 +230,40 @@ extension BLEService: CBCentralManagerDelegate {
     }
     
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
-        let rssiValue = RSSI.intValue
-        print("Discovered Tap device with RSSI: \(rssiValue) dBm")
+        let rawRSSIValue = RSSI.intValue
+        
+        // Filter out invalid RSSI readings
+        guard rawRSSIValue != invalidRSSI else {
+            print("Ignoring invalid RSSI reading")
+            return
+        }
+        
+        // Apply exponential smoothing to RSSI
+        let smoothedRSSI = Int(Double(lastValidRSSI) * (1.0 - rssiSmoothingFactor) + Double(rawRSSIValue) * rssiSmoothingFactor)
+        
+        // Check if the reading is consistent with the last one
+        if abs(smoothedRSSI - lastValidRSSI) <= 3 {
+            consecutiveValidReadings += 1
+        } else {
+            consecutiveValidReadings = 0
+        }
+        
+        lastValidRSSI = smoothedRSSI
+        
+        print("Raw RSSI: \(rawRSSIValue) dBm, Smoothed RSSI: \(smoothedRSSI) dBm, Consistent Readings: \(consecutiveValidReadings)")
         print("Connection threshold: \(rssiThresholdForConnection) dBm")
-        print("Will connect: \(rssiValue >= rssiThresholdForConnection)")
         
         // Update isInRange and provide haptic feedback when getting close
         let nowTime = Date().timeIntervalSince1970
         let shouldTriggerHaptic = (nowTime - lastHapticTime) > hapticThrottleInterval
         
-        if rssiValue < rssiThresholdForHaptic {
-            print("Too far for haptic feedback: \(rssiValue) < \(rssiThresholdForHaptic)")
+        if smoothedRSSI < rssiThresholdForHaptic {
+            print("Too far for haptic feedback: \(smoothedRSSI) < \(rssiThresholdForHaptic)")
             DispatchQueue.main.async {
                 self.isInRange = false
             }
         } else {
-            print("In range for haptic: \(rssiValue) >= \(rssiThresholdForHaptic)")
+            print("In range for haptic: \(smoothedRSSI) >= \(rssiThresholdForHaptic)")
             if !isInRange && shouldTriggerHaptic {
                 DispatchQueue.main.async {
                     self.isInRange = true
@@ -240,9 +274,11 @@ extension BLEService: CBCentralManagerDelegate {
             }
         }
         
-        // Only connect if the device is close enough
-        if rssiValue >= rssiThresholdForConnection && connectionState == .disconnected {
-            print("✅ Device is in range, connecting... RSSI: \(rssiValue)")
+        // Only connect if we have consistent readings and are close enough
+        if smoothedRSSI >= rssiThresholdForConnection && 
+           consecutiveValidReadings >= requiredConsistentReadings && 
+           connectionState == .disconnected {
+            print("✅ Device in range with consistent readings, connecting... Smoothed RSSI: \(smoothedRSSI)")
             connect(peripheral: peripheral)
             DispatchQueue.main.async {
                 self.hapticEngine.impactOccurred(intensity: 1.0)
@@ -250,8 +286,10 @@ extension BLEService: CBCentralManagerDelegate {
         } else {
             if connectionState != .disconnected {
                 print("❌ Not connecting: Already in state: \(connectionState)")
+            } else if consecutiveValidReadings < requiredConsistentReadings {
+                print("❌ Not connecting: Need more consistent readings (\(consecutiveValidReadings)/\(requiredConsistentReadings))")
             } else {
-                print("❌ Not connecting: RSSI \(rssiValue) < threshold \(rssiThresholdForConnection)")
+                print("❌ Not connecting: Smoothed RSSI \(smoothedRSSI) < threshold \(rssiThresholdForConnection)")
             }
         }
     }
@@ -347,11 +385,17 @@ extension BLEService: CBPeripheralManagerDelegate {
                let message = String(data: data, encoding: .utf8) {
                 print("Received write request with message: \(message)")
                 
-                // If it's a payment response and it's approved, clear the request
-                if message.starts(with: "PAYMENT_RESPONSE:") && message.contains("APPROVED") {
+                // Handle both approved and declined responses
+                if message.starts(with: "PAYMENT_RESPONSE:") {
+                    let isApproved = message.contains("APPROVED")
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                         self.receivedMessage = nil
-                        self.stopAdvertising() // Stop advertising since payment is complete
+                        self.stopAdvertising() // Stop advertising regardless of response
+                        
+                        // If payment was declined, also clear the pending request
+                        if !isApproved {
+                            self.pendingPaymentRequest = nil
+                        }
                     }
                 }
                 
