@@ -411,6 +411,7 @@ struct RequestPaymentForm: View {
 }
 
 struct SendMonForm: View {
+    @StateObject private var privyService = PrivyService.shared
     @State private var recipientAddress: String = ""
     @State private var amount: String = ""
     let onSend: (String, Double) -> Void
@@ -423,11 +424,17 @@ struct SendMonForm: View {
                     TextField("Enter wallet address", text: $recipientAddress)
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
+                        .onAppear {
+                            recipientAddress = privyService.defaultRecipientAddress
+                        }
                 }
                 
                 Section(header: Text("Amount")) {
                     TextField("Amount (MON)", text: $amount)
                         .keyboardType(.decimalPad)
+                        .onAppear {
+                            amount = String(format: "%.2f", privyService.defaultAmount)
+                        }
                 }
             }
             .navigationTitle("Send MON")
