@@ -275,69 +275,45 @@ class PrivyService: ObservableObject {
     }
     
     @MainActor
-    func sendMon(to recipientAddress: String? = nil, amount: Double? = nil) async {
-        do {
-            // Use provided values or defaults
-            let finalRecipientAddress = recipientAddress ?? defaultRecipientAddress
-            let finalAmount = amount ?? defaultAmount
-            
-            // First ensure wallet is connected
-            if case .notConnected = embeddedWalletState {
-                print("Wallet not connected, attempting to connect...")
-                await connectWallet()
-            }
-            
-            guard case .connected(let wallets) = privy.embeddedWallet.embeddedWalletState else {
-                print("Wallet not connected")
-                return
-            }
-            
-            guard let wallet = wallets.first, wallet.chainType == .ethereum else {
-                print("No Ethereum wallets available")
-                return
-            }
-            
-            print("Sending \(finalAmount) MON to \(finalRecipientAddress)")
-            
-            // Convert MON amount to wei (1 MON = 1e18 wei)
-            let weiAmount = UInt64(finalAmount * 1e18)
-            
-            // Create transaction data exactly as per Privy docs
-            let tx = try JSONEncoder().encode([
-                "value": "0x" + String(weiAmount, radix: 16),
-                "to": finalRecipientAddress,
-                "chainId": "0x279f", // Monad testnet chainId
-                "from": wallet.address
-            ])
-            
-            guard let txString = String(data: tx, encoding: .utf8) else {
-                print("Data parse error")
-                return
-            }
-            
-            print("Sending transaction with data: \(txString)")
-            
-            // Get provider for the wallet
-            let provider = try privy.embeddedWallet.getEthereumProvider(for: wallet.address)
-            
-            // Send transaction
-            let transactionHash = try await provider.request(
-                RpcRequest(
-                    method: "eth_sendTransaction",
-                    params: [txString]
-                )
-            )
-            
-            print("Transaction sent successfully: \(transactionHash)")
-            
-            // Refresh balance after sending
-            await fetchBalance()
-        } catch {
-            print("Error sending transaction: \(error)")
-            print("Error details: \(String(describing: error))")
-            // Try to reconnect wallet on error
-            await connectWallet()
+    func sendTransaction() async throws {
+        guard case .connected(let wallets) = privy.embeddedWallet.embeddedWalletState else {
+            print("Wallet not connected")
+            return
         }
+
+        guard let wallet = wallets.first, wallet.chainType == .ethereum else {
+            print("No Ethereum wallets available")
+            return
+        }
+
+        let tx = try JSONEncoder().encode([
+            "value": toHexString(100000000000000), // use a wei value in hex format
+            "to": "0x52a4f8E69A12C36EF43d23DfA4d13D9c3bCae844", // destination address
+            "chainId": "0x279f", // Sepolia chainId as hex, defaults to mainnet (1) if omitted
+            "from": wallet.address, // logged in user's embedded wallet address
+        ])
+
+        guard let txString = String(data: tx, encoding: .utf8) else {
+            print("Data parse error")
+            return
+        }
+
+        // Get RPC provider for wallet
+        let provider = try privy.embeddedWallet.getEthereumProvider(for: wallet.address)
+
+        let transactionHash = try await provider.request(
+            RpcRequest(
+                method: "eth_sendTransaction",
+                params: [txString]
+            )
+        )
+
+        print(transactionHash)
+    }
+    
+    // Add this helper function
+    private func toHexString(_ number: UInt64) -> String {
+        return "0x" + String(format: "%llx", number)
     }
 }
 

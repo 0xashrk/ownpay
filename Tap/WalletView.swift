@@ -239,7 +239,11 @@ struct WalletView: View {
             .sheet(isPresented: $showingSendForm) {
                 SendMonForm { recipientAddress, amount in
                     Task {
-                        await privyService.sendMon(to: recipientAddress, amount: amount)
+                        do {
+                            try await privyService.sendTransaction()
+                        } catch {
+                            print("Error sending transaction: \(error)")
+                        }
                     }
                     showingSendForm = false
                 }
@@ -271,6 +275,16 @@ struct WalletView: View {
     
     private func playPaymentSound() {
         AudioServicesPlaySystemSound(1407) // This is Apple Pay's success sound
+    }
+    
+    private func sendMon() {
+        Task {
+            do {
+                try await privyService.sendTransaction()
+            } catch {
+                print("Error sending transaction: \(error)")
+            }
+        }
     }
 }
 
@@ -444,7 +458,14 @@ struct SendMonForm: View {
                 },
                 trailing: Button("Send") {
                     if let amountDouble = Double(amount) {
-                        onSend(recipientAddress, amountDouble)
+                        Task {
+                            do {
+                                try await privyService.sendTransaction()
+                            } catch {
+                                print("Error sending transaction: \(error)")
+                            }
+                        }
+                        dismiss()
                     }
                 }
                 .disabled(recipientAddress.isEmpty || amount.isEmpty)
