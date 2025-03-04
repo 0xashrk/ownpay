@@ -14,6 +14,9 @@ class PrivyService: ObservableObject {
     private var privy: Privy!
     private var ethereumProvider: EthereumEmbeddedWalletProvider?
     
+    // Add Sepolia RPC URL
+    private let sepoliaRPCURL = "https://sepolia.infura.io/v3/6776e581d8a64e198dbf80b920c6d2ae" // Replace with your Infura/Alchemy project ID
+    
     private init() {
         print("Initializing PrivyService with appId: \(Config.privyAppId)")
         print("Client ID: \(Config.privyClientId)")
@@ -188,51 +191,37 @@ class PrivyService: ObservableObject {
     
     @MainActor
     func fetchBalance() async {
-        guard case .connected(let wallets) = privy.embeddedWallet.embeddedWalletState else {
-            print("Cannot fetch balance: Wallet not connected")
-            balance = "0.0000 ETH"  // Set default balance when not connected
-            return
-        }
-        
-        // Find an Ethereum wallet
-        guard let wallet = wallets.first, wallet.chainType == .ethereum else {
-            print("Cannot fetch balance: No Ethereum wallets available")
-            balance = "0.0000 ETH"  // Set default balance when no wallet
-            return
-        }
+        guard let address = walletAddress else { return }
         
         do {
-            // Get the provider specifically for this wallet
-            let provider = try privy.embeddedWallet.getEthereumProvider(for: wallet.address)
-            print("Got ethereum provider for wallet: \(wallet.address)")
+            let url = URL(string: sepoliaRPCURL)!
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             
-            // Create RPC request for eth_getBalance
-            let request = RpcRequest(
-                method: "eth_getBalance",
-                params: [wallet.address, "latest"]
-            )
+            let jsonBody: [String: Any] = [
+                "jsonrpc": "2.0",
+                "method": "eth_getBalance",
+                "params": [address, "latest"],
+                "id": 1
+            ]
             
-            // Make the RPC call
-            let response = try await provider.request(request)
-            print("Got balance response: \(response)")
+            request.httpBody = try JSONSerialization.data(withJSONObject: jsonBody)
             
-            // Parse the hex balance
-            if let hexBalance = response as? String {
-                let balanceHex = hexBalance.replacingOccurrences(of: "0x", with: "")
-                if let balanceDecimal = Int(balanceHex, radix: 16) {
-                    // Convert from Wei to ETH
-                    let ethBalance = Double(balanceDecimal) / 1e18
-                    balance = String(format: "%.4f ETH", ethBalance)
-                    print("Updated balance: \(balance ?? "nil")")
-                } else {
-                    balance = "0.0000 ETH"  // Set zero balance if parsing fails
-                }
-            } else {
-                balance = "0.0000 ETH"  // Set zero balance if response is not a string
+            let (data, _) = try await URLSession.shared.data(for: request)
+            let response = try JSONDecoder().decode(JSONRPCResponse.self, from: data)
+            
+            // Convert hex balance to ETH
+            let balanceHex = response.result
+            let balance = Double(Int(balanceHex.dropFirst(2), radix: 16) ?? 0) / 1e18
+            await MainActor.run {
+                self.balance = String(format: "%.4f ETH", balance)
             }
         } catch {
             print("Error fetching balance: \(error)")
-            balance = "0.0000 ETH"  // Set zero balance on error
+            await MainActor.run {
+                self.balance = "Error"
+            }
         }
     }
 }
@@ -280,4 +269,11 @@ enum EmbeddedWalletState {
 
 struct Wallet {
     let address: String
+}
+
+// Add JSON-RPC response structure
+struct JSONRPCResponse: Codable {
+    let jsonrpc: String
+    let result: String
+    let id: Int
 } 
