@@ -20,10 +20,24 @@ class PrivyService: ObservableObject {
     private var ethereumProvider: EthereumEmbeddedWalletProvider?
     
     // Update RPC URL to Monad testnet
-    private let monadRPCURL = "https://testnet-rpc.monad.xyz"
+    private let monadRPCURL = "https://lb.drpc.org/ogrpc?network=monad-testnet&dkey=AnChAsqfqkWPkLaja7Bky5eCjS9e748R776n0mSYF3e0"
     
     // Add MON token contract address for Monad testnet
     private let monTokenAddress = "0xB5a30b0FDc5EA94A52fDc42e3E9760Cb8449Fb37" // Replace with actual MON token address
+    
+    // Add chain parameters as a property to ensure consistency
+    private let monadChainParams: [String: Any] = [
+        "chainId": "0x279f",
+        "chainName": "Monad Testnet",
+        "nativeCurrency": [
+            "name": "MON",
+            "symbol": "MON",
+            "decimals": 18
+        ],
+        "rpcUrls": ["https://lb.drpc.org/ogrpc?network=monad-testnet&dkey=AnChAsqfqkWPkLaja7Bky5eCjS9e748R776n0mSYF3e0"],
+        "blockExplorerUrls": ["https://testnet-explorer.monad.xyz"],
+        "iconUrls": ["https://testnet-explorer.monad.xyz/favicon.ico"]
+    ]
     
     private init() {
         print("Initializing PrivyService with appId: \(Config.privyAppId)")
@@ -118,105 +132,11 @@ class PrivyService: ObservableObject {
                     if case .embeddedWallet(let wallet) = ethereumWallet {
                         self.walletAddress = wallet.address
                         self.embeddedWalletState = .connected(wallets: [Wallet(address: wallet.address)])
-                        print("Using wallet from auth session: \(wallet.address)")
+                        print("Found wallet from auth session: \(wallet.address)")
                         
                         // Get the provider for this specific wallet
                         ethereumProvider = try privy.embeddedWallet.getEthereumProvider(for: wallet.address)
                         print("Got ethereum provider for wallet")
-                        
-                        // Configure provider to use Monad testnet
-                        do {
-                            print("Attempting to switch to Monad testnet...")
-                            let switchParams = try JSONSerialization.data(withJSONObject: [["chainId": "0x279f"]])
-                            let switchParamsString = String(data: switchParams, encoding: .utf8)!
-                            print("Switch params: \(switchParamsString)")
-                            do {
-                                _ = try await ethereumProvider?.request(
-                                    RpcRequest(
-                                        method: "wallet_switchEthereumChain",
-                                        params: [switchParamsString]
-                                    )
-                                )
-                                print("Successfully switched to Monad testnet")
-                            } catch let error as WalletError {
-                                print("Wallet error during chain switch: \(error)")
-                                throw error
-                            } catch {
-                                print("Unexpected error during chain switch: \(error)")
-                                print("Error description: \(error.localizedDescription)")
-                                print("Error domain: \(error._domain)")
-                                print("Error code: \(error._code)")
-                                throw WalletError.rpcError("Chain switch failed: \(error.localizedDescription)")
-                            }
-                        } catch {
-                            print("Error switching chain: \(error)")
-                            print("Error details: \(String(describing: error))")
-                            print("Attempting to add chain...")
-                            // If chain not added, add it first
-                            let chainParams: [String: Any] = [
-                                "chainId": "0x279f",
-                                "chainName": "Monad Testnet",
-                                "nativeCurrency": [
-                                    "name": "MON",
-                                    "symbol": "MON",
-                                    "decimals": 18
-                                ],
-                                "rpcUrls": ["https://testnet-rpc.monad.xyz"],
-                                "blockExplorerUrls": ["https://testnet-explorer.monad.xyz"],
-                                "iconUrls": ["https://testnet-explorer.monad.xyz/favicon.ico"]
-                            ]
-                            let addParams = try JSONSerialization.data(withJSONObject: [chainParams])
-                            let addParamsString = String(data: addParams, encoding: .utf8)!
-                            print("Add chain params: \(addParamsString)")
-                            
-                            do {
-                                do {
-                                    _ = try await ethereumProvider?.request(
-                                        RpcRequest(
-                                            method: "wallet_addEthereumChain",
-                                            params: [addParamsString]
-                                        )
-                                    )
-                                    print("Successfully added Monad testnet")
-                                    
-                                    // Now try switching again
-                                    let switchParams = try JSONSerialization.data(withJSONObject: [["chainId": "0x279f"]])
-                                    let switchParamsString = String(data: switchParams, encoding: .utf8)!
-                                    print("Switch params (after add): \(switchParamsString)")
-                                    do {
-                                        _ = try await ethereumProvider?.request(
-                                            RpcRequest(
-                                                method: "wallet_switchEthereumChain",
-                                                params: [switchParamsString]
-                                            )
-                                        )
-                                        print("Successfully switched to Monad testnet")
-                                    } catch let error as WalletError {
-                                        print("Wallet error during second chain switch: \(error)")
-                                        throw error
-                                    } catch {
-                                        print("Unexpected error during second chain switch: \(error)")
-                                        print("Error description: \(error.localizedDescription)")
-                                        print("Error domain: \(error._domain)")
-                                        print("Error code: \(error._code)")
-                                        throw WalletError.rpcError("Second chain switch failed: \(error.localizedDescription)")
-                                    }
-                                } catch let error as WalletError {
-                                    print("Wallet error during chain add: \(error)")
-                                    throw error
-                                } catch {
-                                    print("Unexpected error during chain add: \(error)")
-                                    print("Error description: \(error.localizedDescription)")
-                                    print("Error domain: \(error._domain)")
-                                    print("Error code: \(error._code)")
-                                    throw WalletError.rpcError("Chain add failed: \(error.localizedDescription)")
-                                }
-                            } catch {
-                                print("Error adding/switching chain: \(error)")
-                                print("Error details: \(String(describing: error))")
-                                throw error
-                            }
-                        }
                         
                         // Try to fetch balance
                         await self.fetchBalance()
@@ -236,100 +156,6 @@ class PrivyService: ObservableObject {
                     // Get the provider for this specific wallet
                     ethereumProvider = try privy.embeddedWallet.getEthereumProvider(for: wallet.address)
                     print("Got ethereum provider for wallet")
-                    
-                    // Configure provider to use Monad testnet
-                    do {
-                        print("Attempting to switch to Monad testnet...")
-                        let switchParams = try JSONSerialization.data(withJSONObject: [["chainId": "0x279f"]])
-                        let switchParamsString = String(data: switchParams, encoding: .utf8)!
-                        print("Switch params: \(switchParamsString)")
-                        do {
-                            _ = try await ethereumProvider?.request(
-                                RpcRequest(
-                                    method: "wallet_switchEthereumChain",
-                                    params: [switchParamsString]
-                                )
-                            )
-                            print("Successfully switched to Monad testnet")
-                        } catch let error as WalletError {
-                            print("Wallet error during chain switch: \(error)")
-                            throw error
-                        } catch {
-                            print("Unexpected error during chain switch: \(error)")
-                            print("Error description: \(error.localizedDescription)")
-                            print("Error domain: \(error._domain)")
-                            print("Error code: \(error._code)")
-                            throw WalletError.rpcError("Chain switch failed: \(error.localizedDescription)")
-                        }
-                    } catch {
-                        print("Error switching chain: \(error)")
-                        print("Error details: \(String(describing: error))")
-                        print("Attempting to add chain...")
-                        // If chain not added, add it first
-                        let chainParams: [String: Any] = [
-                            "chainId": "0x279f",
-                            "chainName": "Monad Testnet",
-                            "nativeCurrency": [
-                                "name": "MON",
-                                "symbol": "MON",
-                                "decimals": 18
-                            ],
-                            "rpcUrls": ["https://testnet-rpc.monad.xyz"],
-                            "blockExplorerUrls": ["https://testnet-explorer.monad.xyz"],
-                            "iconUrls": ["https://testnet-explorer.monad.xyz/favicon.ico"]
-                        ]
-                        let addParams = try JSONSerialization.data(withJSONObject: [chainParams])
-                        let addParamsString = String(data: addParams, encoding: .utf8)!
-                        print("Add chain params: \(addParamsString)")
-                        
-                        do {
-                            do {
-                                _ = try await ethereumProvider?.request(
-                                    RpcRequest(
-                                        method: "wallet_addEthereumChain",
-                                        params: [addParamsString]
-                                    )
-                                )
-                                print("Successfully added Monad testnet")
-                                
-                                // Now try switching again
-                                let switchParams = try JSONSerialization.data(withJSONObject: [["chainId": "0x279f"]])
-                                let switchParamsString = String(data: switchParams, encoding: .utf8)!
-                                print("Switch params (after add): \(switchParamsString)")
-                                do {
-                                    _ = try await ethereumProvider?.request(
-                                        RpcRequest(
-                                            method: "wallet_switchEthereumChain",
-                                            params: [switchParamsString]
-                                        )
-                                    )
-                                    print("Successfully switched to Monad testnet")
-                                } catch let error as WalletError {
-                                    print("Wallet error during second chain switch: \(error)")
-                                    throw error
-                                } catch {
-                                    print("Unexpected error during second chain switch: \(error)")
-                                    print("Error description: \(error.localizedDescription)")
-                                    print("Error domain: \(error._domain)")
-                                    print("Error code: \(error._code)")
-                                    throw WalletError.rpcError("Second chain switch failed: \(error.localizedDescription)")
-                                }
-                            } catch let error as WalletError {
-                                print("Wallet error during chain add: \(error)")
-                                throw error
-                            } catch {
-                                print("Unexpected error during chain add: \(error)")
-                                print("Error description: \(error.localizedDescription)")
-                                print("Error domain: \(error._domain)")
-                                print("Error code: \(error._code)")
-                                throw WalletError.rpcError("Chain add failed: \(error.localizedDescription)")
-                            }
-                        } catch {
-                            print("Error adding/switching chain: \(error)")
-                            print("Error details: \(String(describing: error))")
-                            throw error
-                        }
-                    }
                     
                     // Try to fetch balance
                     await self.fetchBalance()
@@ -356,100 +182,6 @@ class PrivyService: ObservableObject {
                 // Get the provider for this specific wallet
                 ethereumProvider = try privy.embeddedWallet.getEthereumProvider(for: wallet.address)
                 print("Got ethereum provider for wallet")
-                
-                // Configure provider to use Monad testnet
-                do {
-                    print("Attempting to switch to Monad testnet...")
-                    let switchParams = try JSONSerialization.data(withJSONObject: [["chainId": "0x279f"]])
-                    let switchParamsString = String(data: switchParams, encoding: .utf8)!
-                    print("Switch params: \(switchParamsString)")
-                    do {
-                        _ = try await ethereumProvider?.request(
-                            RpcRequest(
-                                method: "wallet_switchEthereumChain",
-                                params: [switchParamsString]
-                            )
-                        )
-                        print("Successfully switched to Monad testnet")
-                    } catch let error as WalletError {
-                        print("Wallet error during chain switch: \(error)")
-                        throw error
-                    } catch {
-                        print("Unexpected error during chain switch: \(error)")
-                        print("Error description: \(error.localizedDescription)")
-                        print("Error domain: \(error._domain)")
-                        print("Error code: \(error._code)")
-                        throw WalletError.rpcError("Chain switch failed: \(error.localizedDescription)")
-                    }
-                } catch {
-                    print("Error switching chain: \(error)")
-                    print("Error details: \(String(describing: error))")
-                    print("Attempting to add chain...")
-                    // If chain not added, add it first
-                    let chainParams: [String: Any] = [
-                        "chainId": "0x279f",
-                        "chainName": "Monad Testnet",
-                        "nativeCurrency": [
-                            "name": "MON",
-                            "symbol": "MON",
-                            "decimals": 18
-                        ],
-                        "rpcUrls": ["https://testnet-rpc.monad.xyz"],
-                        "blockExplorerUrls": ["https://testnet-explorer.monad.xyz"],
-                        "iconUrls": ["https://testnet-explorer.monad.xyz/favicon.ico"]
-                    ]
-                    let addParams = try JSONSerialization.data(withJSONObject: [chainParams])
-                    let addParamsString = String(data: addParams, encoding: .utf8)!
-                    print("Add chain params: \(addParamsString)")
-                    
-                    do {
-                        do {
-                            _ = try await ethereumProvider?.request(
-                                RpcRequest(
-                                    method: "wallet_addEthereumChain",
-                                    params: [addParamsString]
-                                )
-                            )
-                            print("Successfully added Monad testnet")
-                            
-                            // Now try switching again
-                            let switchParams = try JSONSerialization.data(withJSONObject: [["chainId": "0x279f"]])
-                            let switchParamsString = String(data: switchParams, encoding: .utf8)!
-                            print("Switch params (after add): \(switchParamsString)")
-                            do {
-                                _ = try await ethereumProvider?.request(
-                                    RpcRequest(
-                                        method: "wallet_switchEthereumChain",
-                                        params: [switchParamsString]
-                                    )
-                                )
-                                print("Successfully switched to Monad testnet")
-                            } catch let error as WalletError {
-                                print("Wallet error during second chain switch: \(error)")
-                                throw error
-                            } catch {
-                                print("Unexpected error during second chain switch: \(error)")
-                                print("Error description: \(error.localizedDescription)")
-                                print("Error domain: \(error._domain)")
-                                print("Error code: \(error._code)")
-                                throw WalletError.rpcError("Second chain switch failed: \(error.localizedDescription)")
-                            }
-                        } catch let error as WalletError {
-                            print("Wallet error during chain add: \(error)")
-                            throw error
-                        } catch {
-                            print("Unexpected error during chain add: \(error)")
-                            print("Error description: \(error.localizedDescription)")
-                            print("Error domain: \(error._domain)")
-                            print("Error code: \(error._code)")
-                            throw WalletError.rpcError("Chain add failed: \(error.localizedDescription)")
-                        }
-                    } catch {
-                        print("Error adding/switching chain: \(error)")
-                        print("Error details: \(String(describing: error))")
-                        throw error
-                    }
-                }
                 
                 // Try to fetch balance
                 await self.fetchBalance()
@@ -555,19 +287,13 @@ class PrivyService: ObservableObject {
                 await connectWallet()
             }
             
-            guard let address = walletAddress else {
-                print("No wallet address available")
+            guard case .connected(let wallets) = privy.embeddedWallet.embeddedWalletState else {
+                print("Wallet not connected")
                 return
             }
             
-            // Get provider if not already initialized
-            if ethereumProvider == nil {
-                print("Provider not initialized, getting provider for wallet: \(address)")
-                ethereumProvider = try privy.embeddedWallet.getEthereumProvider(for: address)
-            }
-            
-            guard let provider = ethereumProvider else {
-                print("Failed to initialize provider")
+            guard let wallet = wallets.first, wallet.chainType == .ethereum else {
+                print("No Ethereum wallets available")
                 return
             }
             
@@ -576,59 +302,33 @@ class PrivyService: ObservableObject {
             // Convert MON amount to wei (1 MON = 1e18 wei)
             let weiAmount = UInt64(finalAmount * 1e18)
             
-            // Create transaction data
+            // Create transaction data exactly as per Privy docs
             let tx = try JSONEncoder().encode([
-                "value": "0x" + String(weiAmount, radix: 16), // wei value in hex format
-                "to": finalRecipientAddress, // destination address
+                "value": "0x" + String(weiAmount, radix: 16),
+                "to": finalRecipientAddress,
                 "chainId": "0x279f", // Monad testnet chainId
-                "from": address, // sender's address
-                "gas": "0x5208", // 21000 gas limit
-                "maxFeePerGas": "0x59682f00", // 1.5 Gwei
-                "maxPriorityFeePerGas": "0x59682f00" // 1.5 Gwei
+                "from": wallet.address
             ])
             
             guard let txString = String(data: tx, encoding: .utf8) else {
-                print("Failed to encode transaction data")
+                print("Data parse error")
                 return
             }
             
             print("Sending transaction with data: \(txString)")
             
-            // Ensure we're on the correct chain
-            let switchParams = try JSONSerialization.data(withJSONObject: [["chainId": "0x279f"]])
-            let switchParamsString = String(data: switchParams, encoding: .utf8)!
-            print("Switch params (before transaction): \(switchParamsString)")
-            do {
-                _ = try await provider.request(
-                    RpcRequest(
-                        method: "wallet_switchEthereumChain",
-                        params: [switchParamsString]
-                    )
-                )
-            } catch let error as WalletError {
-                print("Wallet error during pre-transaction chain switch: \(error)")
-                throw error
-            } catch {
-                print("Unexpected error during pre-transaction chain switch: \(error)")
-                throw WalletError.rpcError("Pre-transaction chain switch failed: \(error.localizedDescription)")
-            }
+            // Get provider for the wallet
+            let provider = try privy.embeddedWallet.getEthereumProvider(for: wallet.address)
             
-            // Send transaction using eth_sendTransaction
-            do {
-                let transactionHash = try await provider.request(
-                    RpcRequest(
-                        method: "eth_sendTransaction",
-                        params: [txString]
-                    )
+            // Send transaction
+            let transactionHash = try await provider.request(
+                RpcRequest(
+                    method: "eth_sendTransaction",
+                    params: [txString]
                 )
-                print("Transaction sent successfully: \(transactionHash)")
-            } catch let error as WalletError {
-                print("Wallet error during transaction: \(error)")
-                throw error
-            } catch {
-                print("Unexpected error during transaction: \(error)")
-                throw WalletError.rpcError("Transaction failed: \(error.localizedDescription)")
-            }
+            )
+            
+            print("Transaction sent successfully: \(transactionHash)")
             
             // Refresh balance after sending
             await fetchBalance()
