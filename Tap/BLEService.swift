@@ -24,8 +24,8 @@ class BLEService: NSObject, ObservableObject {
     @Published var isInRange = false // New property to track if device is in tap range
     
     // RSSI thresholds
-    private let rssiThresholdForConnection: Int = -25  // Extremely close, ~1-2cm
-    private let rssiThresholdForHaptic: Int = -30     // Slightly further, gives user feedback as they get closer
+    private let rssiThresholdForConnection: Int = -55  // Much more lenient, ~20cm
+    private let rssiThresholdForHaptic: Int = -65     // Start haptic feedback earlier
     
     enum ConnectionState {
         case disconnected
@@ -216,34 +216,43 @@ extension BLEService: CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
         let rssiValue = RSSI.intValue
         print("Discovered Tap device with RSSI: \(rssiValue) dBm")
+        print("Connection threshold: \(rssiThresholdForConnection) dBm")
+        print("Will connect: \(rssiValue >= rssiThresholdForConnection)")
         
         // Update isInRange and provide haptic feedback when getting close
         let nowTime = Date().timeIntervalSince1970
         let shouldTriggerHaptic = (nowTime - lastHapticTime) > hapticThrottleInterval
         
-        if rssiValue > rssiThresholdForHaptic {
+        if rssiValue < rssiThresholdForHaptic {
+            print("Too far for haptic feedback: \(rssiValue) < \(rssiThresholdForHaptic)")
+            DispatchQueue.main.async {
+                self.isInRange = false
+            }
+        } else {
+            print("In range for haptic: \(rssiValue) >= \(rssiThresholdForHaptic)")
             if !isInRange && shouldTriggerHaptic {
                 DispatchQueue.main.async {
                     self.isInRange = true
                     self.hapticEngine.impactOccurred()
                     self.lastHapticTime = nowTime
+                    print("Triggered haptic feedback")
                 }
-            }
-        } else {
-            DispatchQueue.main.async {
-                self.isInRange = false
             }
         }
         
-        // Only connect if the device is extremely close (practically touching)
-        if rssiValue > rssiThresholdForConnection && connectionState == .disconnected {
-            print("Device is in extremely close proximity (tap range), connecting...")
+        // Only connect if the device is close enough
+        if rssiValue >= rssiThresholdForConnection && connectionState == .disconnected {
+            print("✅ Device is in range, connecting... RSSI: \(rssiValue)")
             connect(peripheral: peripheral)
             DispatchQueue.main.async {
-                self.hapticEngine.impactOccurred(intensity: 1.0) // Strong haptic for successful connection
+                self.hapticEngine.impactOccurred(intensity: 1.0)
             }
         } else {
-            print("Device is too far away for tap interaction, RSSI: \(rssiValue)")
+            if connectionState != .disconnected {
+                print("❌ Not connecting: Already in state: \(connectionState)")
+            } else {
+                print("❌ Not connecting: RSSI \(rssiValue) < threshold \(rssiThresholdForConnection)")
+            }
         }
     }
     
