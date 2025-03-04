@@ -9,6 +9,9 @@ class BLEService: NSObject, ObservableObject {
     private var characteristic: CBCharacteristic?
     private var pendingPaymentRequest: String?
     private var shouldStartScanningWhenReady = false
+    private let hapticEngine = UIImpactFeedbackGenerator(style: .rigid)
+    private var lastHapticTime: TimeInterval = 0
+    private let hapticThrottleInterval: TimeInterval = 0.5 // Minimum time between haptics
     
     // Custom service UUID for our app - using a 16-bit UUID
     private let serviceUUID = CBUUID(string: "FFE0")
@@ -18,6 +21,11 @@ class BLEService: NSObject, ObservableObject {
     @Published var isAdvertising = false
     @Published var receivedMessage: String?
     @Published var connectionState: ConnectionState = .disconnected
+    @Published var isInRange = false // New property to track if device is in tap range
+    
+    // RSSI thresholds
+    private let rssiThresholdForConnection: Int = -25  // Extremely close, ~1-2cm
+    private let rssiThresholdForHaptic: Int = -30     // Slightly further, gives user feedback as they get closer
     
     enum ConnectionState {
         case disconnected
@@ -29,7 +37,8 @@ class BLEService: NSObject, ObservableObject {
         super.init()
         centralManager = CBCentralManager(delegate: self, queue: nil)
         peripheralManager = CBPeripheralManager(delegate: self, queue: nil)
-        shouldStartScanningWhenReady = true // Set to start scanning when Bluetooth is ready
+        shouldStartScanningWhenReady = true
+        hapticEngine.prepare() // Prepare haptic engine
     }
     
     func startScanning() {
@@ -37,7 +46,15 @@ class BLEService: NSObject, ObservableObject {
             print("Starting scan immediately")
             isScanning = true
             connectionState = .disconnected
-            centralManager.scanForPeripherals(withServices: [serviceUUID], options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
+            
+            // Add RSSI filter and minimum power options
+            let options: [String: Any] = [
+                CBCentralManagerScanOptionAllowDuplicatesKey: true,
+                // Set absolute minimum power level
+                CBAdvertisementDataTxPowerLevelKey: NSNumber(value: Int8.min)
+            ]
+            
+            centralManager.scanForPeripherals(withServices: [serviceUUID], options: options)
         } else {
             print("Will start scanning when Bluetooth is ready")
             shouldStartScanningWhenReady = true
@@ -57,9 +74,12 @@ class BLEService: NSObject, ObservableObject {
         // Create the service if not already created
         setupService()
         
+        // Add absolute minimum power level to reduce range
         let advertisementData: [String: Any] = [
             CBAdvertisementDataServiceUUIDsKey: [serviceUUID],
-            CBAdvertisementDataLocalNameKey: "Tap Payment"
+            CBAdvertisementDataLocalNameKey: "Tap Payment",
+            // Set absolute minimum power level
+            CBAdvertisementDataTxPowerLevelKey: NSNumber(value: Int8.min)
         ]
         peripheralManager.startAdvertising(advertisementData)
     }
@@ -194,10 +214,36 @@ extension BLEService: CBCentralManagerDelegate {
     }
     
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
-        print("Discovered Tap device")
-        // Only connect if we're not already connected
-        if connectionState == .disconnected {
+        let rssiValue = RSSI.intValue
+        print("Discovered Tap device with RSSI: \(rssiValue) dBm")
+        
+        // Update isInRange and provide haptic feedback when getting close
+        let nowTime = Date().timeIntervalSince1970
+        let shouldTriggerHaptic = (nowTime - lastHapticTime) > hapticThrottleInterval
+        
+        if rssiValue > rssiThresholdForHaptic {
+            if !isInRange && shouldTriggerHaptic {
+                DispatchQueue.main.async {
+                    self.isInRange = true
+                    self.hapticEngine.impactOccurred()
+                    self.lastHapticTime = nowTime
+                }
+            }
+        } else {
+            DispatchQueue.main.async {
+                self.isInRange = false
+            }
+        }
+        
+        // Only connect if the device is extremely close (practically touching)
+        if rssiValue > rssiThresholdForConnection && connectionState == .disconnected {
+            print("Device is in extremely close proximity (tap range), connecting...")
             connect(peripheral: peripheral)
+            DispatchQueue.main.async {
+                self.hapticEngine.impactOccurred(intensity: 1.0) // Strong haptic for successful connection
+            }
+        } else {
+            print("Device is too far away for tap interaction, RSSI: \(rssiValue)")
         }
     }
     
