@@ -120,6 +120,55 @@ class PrivyService: ObservableObject {
                         ethereumProvider = try privy.embeddedWallet.getEthereumProvider(for: wallet.address)
                         print("Got ethereum provider for wallet")
                         
+                        // Configure provider to use Monad testnet
+                        do {
+                            print("Attempting to switch to Monad testnet...")
+                            let switchParams = try JSONSerialization.data(withJSONObject: [["chainId": "0x279f"]])
+                            let switchParamsString = String(data: switchParams, encoding: .utf8)!
+                            _ = try await ethereumProvider?.request(
+                                RpcRequest(
+                                    method: "wallet_switchEthereumChain",
+                                    params: [switchParamsString]
+                                )
+                            )
+                            print("Successfully switched to Monad testnet")
+                        } catch {
+                            print("Error switching chain, attempting to add chain...")
+                            // If chain not added, add it first
+                            let chainParams: [String: Any] = [
+                                "chainId": "0x279f",
+                                "chainName": "Monad Testnet",
+                                "nativeCurrency": [
+                                    "name": "MON",
+                                    "symbol": "MON",
+                                    "decimals": 18
+                                ],
+                                "rpcUrls": [monadRPCURL],
+                                "blockExplorerUrls": ["https://testnet-explorer.monad.xyz"]
+                            ]
+                            let chainParamsString = try JSONSerialization.data(withJSONObject: chainParams)
+                            let chainParamsJsonString = String(data: chainParamsString, encoding: .utf8)!
+                            
+                            _ = try await ethereumProvider?.request(
+                                RpcRequest(
+                                    method: "wallet_addEthereumChain",
+                                    params: [chainParamsJsonString]
+                                )
+                            )
+                            print("Successfully added Monad testnet")
+                            
+                            // Now try switching again
+                            let switchParams = try JSONSerialization.data(withJSONObject: [["chainId": "0x279f"]])
+                            let switchParamsString = String(data: switchParams, encoding: .utf8)!
+                            _ = try await ethereumProvider?.request(
+                                RpcRequest(
+                                    method: "wallet_switchEthereumChain",
+                                    params: [switchParamsString]
+                                )
+                            )
+                            print("Successfully switched to Monad testnet")
+                        }
+                        
                         // Try to fetch balance
                         await self.fetchBalance()
                         isWalletOperationInProgress = false
@@ -139,6 +188,55 @@ class PrivyService: ObservableObject {
                     ethereumProvider = try privy.embeddedWallet.getEthereumProvider(for: wallet.address)
                     print("Got ethereum provider for wallet")
                     
+                    // Configure provider to use Monad testnet
+                    do {
+                        print("Attempting to switch to Monad testnet...")
+                        let switchParams = try JSONSerialization.data(withJSONObject: [["chainId": "0x279f"]])
+                        let switchParamsString = String(data: switchParams, encoding: .utf8)!
+                        _ = try await ethereumProvider?.request(
+                            RpcRequest(
+                                method: "wallet_switchEthereumChain",
+                                params: [switchParamsString]
+                            )
+                        )
+                        print("Successfully switched to Monad testnet")
+                    } catch {
+                        print("Error switching chain, attempting to add chain...")
+                        // If chain not added, add it first
+                        let chainParams: [String: Any] = [
+                            "chainId": "0x279f",
+                            "chainName": "Monad Testnet",
+                            "nativeCurrency": [
+                                "name": "MON",
+                                "symbol": "MON",
+                                "decimals": 18
+                            ],
+                            "rpcUrls": [monadRPCURL],
+                            "blockExplorerUrls": ["https://testnet-explorer.monad.xyz"]
+                        ]
+                        let chainParamsString = try JSONSerialization.data(withJSONObject: chainParams)
+                        let chainParamsJsonString = String(data: chainParamsString, encoding: .utf8)!
+                        
+                        _ = try await ethereumProvider?.request(
+                            RpcRequest(
+                                method: "wallet_addEthereumChain",
+                                params: [chainParamsJsonString]
+                            )
+                        )
+                        print("Successfully added Monad testnet")
+                        
+                        // Now try switching again
+                        let switchParams = try JSONSerialization.data(withJSONObject: [["chainId": "0x279f"]])
+                        let switchParamsString = String(data: switchParams, encoding: .utf8)!
+                        _ = try await ethereumProvider?.request(
+                            RpcRequest(
+                                method: "wallet_switchEthereumChain",
+                                params: [switchParamsString]
+                            )
+                        )
+                        print("Successfully switched to Monad testnet")
+                    }
+                    
                     // Try to fetch balance
                     await self.fetchBalance()
                     isWalletOperationInProgress = false
@@ -149,7 +247,7 @@ class PrivyService: ObservableObject {
             // If no wallet found, create one
             print("No existing wallet found, creating embedded wallet...")
             self.embeddedWalletState = .connecting
-            try await privy.embeddedWallet.createWallet(allowAdditional: false)
+            _ = try await privy.embeddedWallet.createWallet(chainType: .ethereum, allowAdditional: false)
             
             // Wait a bit for the wallet creation to complete
             try await Task.sleep(nanoseconds: 2 * 1_000_000_000) // 2 seconds
@@ -164,6 +262,55 @@ class PrivyService: ObservableObject {
                 // Get the provider for this specific wallet
                 ethereumProvider = try privy.embeddedWallet.getEthereumProvider(for: wallet.address)
                 print("Got ethereum provider for wallet")
+                
+                // Configure provider to use Monad testnet
+                do {
+                    print("Attempting to switch to Monad testnet...")
+                    let switchParams = try JSONSerialization.data(withJSONObject: [["chainId": "0x279f"]])
+                    let switchParamsString = String(data: switchParams, encoding: .utf8)!
+                    _ = try await ethereumProvider?.request(
+                        RpcRequest(
+                            method: "wallet_switchEthereumChain",
+                            params: [switchParamsString]
+                        )
+                    )
+                    print("Successfully switched to Monad testnet")
+                } catch {
+                    print("Error switching chain, attempting to add chain...")
+                    // If chain not added, add it first
+                    let chainParams: [String: Any] = [
+                        "chainId": "0x279f",
+                        "chainName": "Monad Testnet",
+                        "nativeCurrency": [
+                            "name": "MON",
+                            "symbol": "MON",
+                            "decimals": 18
+                        ],
+                        "rpcUrls": [monadRPCURL],
+                        "blockExplorerUrls": ["https://testnet-explorer.monad.xyz"]
+                    ]
+                    let chainParamsString = try JSONSerialization.data(withJSONObject: chainParams)
+                    let chainParamsJsonString = String(data: chainParamsString, encoding: .utf8)!
+                    
+                    _ = try await ethereumProvider?.request(
+                        RpcRequest(
+                            method: "wallet_addEthereumChain",
+                            params: [chainParamsJsonString]
+                        )
+                    )
+                    print("Successfully added Monad testnet")
+                    
+                    // Now try switching again
+                    let switchParams = try JSONSerialization.data(withJSONObject: [["chainId": "0x279f"]])
+                    let switchParamsString = String(data: switchParams, encoding: .utf8)!
+                    _ = try await ethereumProvider?.request(
+                        RpcRequest(
+                            method: "wallet_switchEthereumChain",
+                            params: [switchParamsString]
+                        )
+                    )
+                    print("Successfully switched to Monad testnet")
+                }
                 
                 // Try to fetch balance
                 await self.fetchBalance()
@@ -219,6 +366,13 @@ class PrivyService: ObservableObject {
             let responseString = String(data: data, encoding: .utf8) ?? "Could not decode response"
             print("Received response: \(responseString)")
             
+            // First try to decode as error response
+            if let errorResponse = try? JSONDecoder().decode(JSONRPCErrorResponse.self, from: data) {
+                print("RPC Error: \(errorResponse.error.message)")
+                throw WalletError.rpcError(errorResponse.error.message)
+            }
+            
+            // If not an error, decode as success response
             let response = try JSONDecoder().decode(JSONRPCResponse.self, from: data)
             
             // Convert hex balance to MON (since we're on Monad testnet)
@@ -248,6 +402,84 @@ class PrivyService: ObservableObject {
             }
         }
     }
+    
+    @MainActor
+    func sendMon(to recipientAddress: String, amount: Double) async {
+        do {
+            // First ensure wallet is connected
+            if case .notConnected = embeddedWalletState {
+                print("Wallet not connected, attempting to connect...")
+                await connectWallet()
+            }
+            
+            guard let address = walletAddress else {
+                print("No wallet address available")
+                return
+            }
+            
+            // Get provider if not already initialized
+            if ethereumProvider == nil {
+                print("Provider not initialized, getting provider for wallet: \(address)")
+                ethereumProvider = try privy.embeddedWallet.getEthereumProvider(for: address)
+            }
+            
+            guard let provider = ethereumProvider else {
+                print("Failed to initialize provider")
+                return
+            }
+            
+            print("Sending \(amount) MON to \(recipientAddress)")
+            
+            // Convert MON amount to wei (1 MON = 1e18 wei)
+            let weiAmount = UInt64(amount * 1e18)
+            
+            // Create transaction data
+            let tx = try JSONEncoder().encode([
+                "value": "0x" + String(weiAmount, radix: 16), // wei value in hex format
+                "to": recipientAddress, // destination address
+                "chainId": "0x279f", // Monad testnet chainId
+                "from": address, // sender's address
+                "gas": "0x5208", // 21000 gas limit
+                "maxFeePerGas": "0x59682f00", // 1.5 Gwei
+                "maxPriorityFeePerGas": "0x59682f00" // 1.5 Gwei
+            ])
+            
+            guard let txString = String(data: tx, encoding: .utf8) else {
+                print("Failed to encode transaction data")
+                return
+            }
+            
+            print("Sending transaction with data: \(txString)")
+            
+            // Ensure we're on the correct chain
+            let switchParams = try JSONSerialization.data(withJSONObject: [["chainId": "0x279f"]])
+            let switchParamsString = String(data: switchParams, encoding: .utf8)!
+            _ = try await provider.request(
+                RpcRequest(
+                    method: "wallet_switchEthereumChain",
+                    params: [switchParamsString]
+                )
+            )
+            
+            // Send transaction using eth_sendTransaction
+            let transactionHash = try await provider.request(
+                RpcRequest(
+                    method: "eth_sendTransaction",
+                    params: [txString]
+                )
+            )
+            
+            print("Transaction sent successfully: \(transactionHash)")
+            
+            // Refresh balance after sending
+            await fetchBalance()
+        } catch {
+            print("Error sending transaction: \(error)")
+            print("Error details: \(String(describing: error))")
+            // Try to reconnect wallet on error
+            await connectWallet()
+        }
+    }
 }
 
 // MARK: - Models
@@ -271,6 +503,7 @@ enum AuthError: Error {
 enum WalletError: Error {
     case creationFailed
     case providerNotInitialized
+    case rpcError(String)
 }
 
 enum OTPFlowState {
@@ -300,4 +533,23 @@ struct JSONRPCResponse: Codable {
     let jsonrpc: String
     let result: String
     let id: Int
+}
+
+// Add JSON-RPC error response structure
+struct JSONRPCErrorResponse: Codable {
+    let jsonrpc: String
+    let error: JSONRPCError
+    let id: Int
+}
+
+struct JSONRPCError: Codable {
+    let code: Int
+    let message: String
+}
+
+// Add Transaction struct for the provider
+struct Transaction: Codable {
+    let to: String
+    let value: String
+    let from: String
 } 

@@ -12,6 +12,7 @@ struct WalletView: View {
     @StateObject private var privyService = PrivyService.shared
     @Binding var isLoggedIn: Bool
     @State private var showingRequestForm = false
+    @State private var showingSendForm = false
     @State private var amount: String = "1" // Default to 1 MON
     @State private var isMerchantMode = false
     @State private var showingPaymentSuccess = false
@@ -107,10 +108,30 @@ struct WalletView: View {
                     }
                     .padding(.horizontal)
                 } else {
-                    // Customer View - shows status
-                    Text("Scanning for payment requests...")
-                        .foregroundColor(.secondary)
-                        .padding(.top)
+                    // Customer View - shows status and send button
+                    VStack(spacing: 16) {
+                        Text("Scanning for payment requests...")
+                            .foregroundColor(.secondary)
+                            .padding(.top)
+                        
+                        Button(action: {
+                            selectionGenerator.selectionChanged()
+                            showingSendForm = true
+                        }) {
+                            HStack {
+                                Image(systemName: "paperplane.fill")
+                                    .font(.system(size: 24))
+                                Text("Send MON")
+                                    .font(.headline)
+                            }
+                            .foregroundColor(.blue)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(15)
+                        }
+                        .padding(.horizontal)
+                    }
                 }
                 
                 // Payment Requests (visible to customer)
@@ -213,6 +234,14 @@ struct WalletView: View {
                         bleService.broadcastPaymentRequest(amount: amount, walletAddress: walletAddress)
                     }
                     showingRequestForm = false
+                }
+            }
+            .sheet(isPresented: $showingSendForm) {
+                SendMonForm { recipientAddress, amount in
+                    Task {
+                        await privyService.sendMon(to: recipientAddress, amount: amount)
+                    }
+                    showingSendForm = false
                 }
             }
             .onChange(of: isMerchantMode) { newValue in
@@ -376,6 +405,42 @@ struct RequestPaymentForm: View {
                     }
                 }
                 .disabled(amount.isEmpty)
+            )
+        }
+    }
+}
+
+struct SendMonForm: View {
+    @State private var recipientAddress: String = ""
+    @State private var amount: String = ""
+    let onSend: (String, Double) -> Void
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Recipient Address")) {
+                    TextField("Enter wallet address", text: $recipientAddress)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                }
+                
+                Section(header: Text("Amount")) {
+                    TextField("Amount (MON)", text: $amount)
+                        .keyboardType(.decimalPad)
+                }
+            }
+            .navigationTitle("Send MON")
+            .navigationBarItems(
+                leading: Button("Cancel") {
+                    dismiss()
+                },
+                trailing: Button("Send") {
+                    if let amountDouble = Double(amount) {
+                        onSend(recipientAddress, amountDouble)
+                    }
+                }
+                .disabled(recipientAddress.isEmpty || amount.isEmpty)
             )
         }
     }
