@@ -286,29 +286,93 @@ class PrivyService: ObservableObject {
             return
         }
 
-        let tx = try JSONEncoder().encode([
-            "value": toHexString(100000000000000), // use a wei value in hex format
-            "to": "0x52a4f8E69A12C36EF43d23DfA4d13D9c3bCae844", // destination address
-            "chainId": "0x279f", // Sepolia chainId as hex, defaults to mainnet (1) if omitted
-            "from": wallet.address, // logged in user's embedded wallet address
-        ])
+        // First get the nonce
+        let provider = try privy.embeddedWallet.getEthereumProvider(for: wallet.address)
+        let nonceResponse = try await provider.request(
+            RpcRequest(
+                method: "eth_getTransactionCount",
+                params: [wallet.address, "latest"]
+            )
+        )
+        
+        // Extract just the nonce value from the response
+        let nonce: String
+        if let response = nonceResponse as? [String: Any],
+           let result = response["result"] as? String {
+            nonce = result
+        } else {
+            nonce = "0x0"
+        }
+        print("Got nonce: \(nonce)")
 
-        guard let txString = String(data: tx, encoding: .utf8) else {
-            print("Data parse error")
+        // Create the transfer data for the MON token contract
+        let transferData = "0xa9059cbb" + // transfer function signature
+            "000000000000000000000000" + defaultRecipientAddress.dropFirst(2) + // recipient address
+            "0000000000000000000000000000000000000000000000005af3107a4000" // amount in hex (100000000000000)
+
+        // Create transaction object
+        let tx = [
+            "value": "0x0", // No ETH value needed for token transfer
+            "to": monTokenAddress, // MON token contract address
+            "chainId": "0x279f", // Monad testnet chainId
+            "from": wallet.address, // logged in user's embedded wallet address
+            "gas": toHexString(100000), // Higher gas limit for token transfer
+            "gasPrice": toHexString(1000000000), // 1 Gwei
+            "nonce": nonce,
+            "data": transferData // The encoded transfer function call
+        ]
+
+        // Convert transaction to JSON string
+        let txData = try JSONSerialization.data(withJSONObject: tx)
+        guard let txString = String(data: txData, encoding: .utf8) else {
+            print("Failed to convert transaction to string")
             return
         }
+        print("Transaction data: \(txString)")
 
-        // Get RPC provider for wallet
-        let provider = try privy.embeddedWallet.getEthereumProvider(for: wallet.address)
-
-        let transactionHash = try await provider.request(
+        // Sign the transaction using the provider
+        let signedTx = try await provider.request(
             RpcRequest(
-                method: "eth_sendTransaction",
+                method: "eth_signTransaction",
                 params: [txString]
             )
         )
 
-        print(transactionHash)
+        guard let signedTxString = signedTx as? String else {
+            print("Failed to sign transaction")
+            return
+        }
+
+        print("Got signed transaction: \(signedTxString)")
+
+        // Create a direct RPC request to the Monad testnet
+        let url = URL(string: monadRPCURL)!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let rpcRequest: [String: Any] = [
+            "jsonrpc": "2.0",
+            "method": "eth_sendRawTransaction",
+            "params": [signedTxString],
+            "id": 1
+        ]
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: rpcRequest)
+        
+        let (data, _) = try await URLSession.shared.data(for: request)
+        let responseString = String(data: data, encoding: .utf8) ?? "Could not decode response"
+        print("Received response: \(responseString)")
+        
+        // First try to decode as error response
+        if let errorResponse = try? JSONDecoder().decode(JSONRPCErrorResponse.self, from: data) {
+            print("RPC Error: \(errorResponse.error.message)")
+            throw WalletError.rpcError(errorResponse.error.message)
+        }
+        
+        // If not an error, decode as success response
+        let response = try JSONDecoder().decode(JSONRPCResponse.self, from: data)
+        print("Transaction sent successfully: \(response.result)")
     }
     
     // Add this helper function
