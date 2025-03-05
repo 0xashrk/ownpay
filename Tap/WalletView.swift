@@ -28,7 +28,7 @@ struct WalletView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     // Wallet Address Section
-                    BalanceView()
+                    BalanceView(isMerchantMode: $isMerchantMode)
                     
                     // Mode Toggle with haptic
                     Picker("Mode", selection: $isMerchantMode) {
