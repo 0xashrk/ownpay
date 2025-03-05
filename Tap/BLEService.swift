@@ -9,9 +9,9 @@ class BLEService: NSObject, ObservableObject {
     private var characteristic: CBCharacteristic?
     private var pendingPaymentRequest: String?
     private var shouldStartScanningWhenReady = false
-    private let hapticEngine = UIImpactFeedbackGenerator(style: .rigid)
+    private let hapticEngine = UIImpactFeedbackGenerator(style: .heavy)
     private var lastHapticTime: TimeInterval = 0
-    private let hapticThrottleInterval: TimeInterval = 0.5 // Minimum time between haptics
+    private let hapticThrottleInterval: TimeInterval = 0.3 // Reduced from 0.5 to allow more frequent haptics
     
     // Custom service UUID for our app - using a 16-bit UUID
     private let serviceUUID = CBUUID(string: "FFE0")
@@ -24,13 +24,13 @@ class BLEService: NSObject, ObservableObject {
     @Published var isInRange = false // New property to track if device is in tap range
     
     // RSSI thresholds and filtering
-    private let rssiThresholdForConnection: Int = -20  // Ultra strict, requires almost physical contact
-    private let rssiThresholdForHaptic: Int = -25     // Start haptic feedback at ~2cm
+    private let rssiThresholdForConnection: Int = -30  // Less strict, allows slightly more distance
+    private let rssiThresholdForHaptic: Int = -35     // Start haptic feedback at ~5cm
     private var lastValidRSSI: Int = -100             // Store last valid RSSI
-    private let rssiSmoothingFactor: Double = 0.15    // More aggressive smoothing
+    private let rssiSmoothingFactor: Double = 0.3     // More responsive smoothing
     private let invalidRSSI: Int = 127                // Special value indicating invalid RSSI
     private var consecutiveValidReadings: Int = 0     // Count of consistent readings
-    private let requiredConsistentReadings: Int = 3   // Number of consistent readings required
+    private let requiredConsistentReadings: Int = 2   // Reduced from 3 to 2 for faster connection
     
     enum ConnectionState {
         case disconnected
@@ -56,7 +56,9 @@ class BLEService: NSObject, ObservableObject {
             let options: [String: Any] = [
                 CBCentralManagerScanOptionAllowDuplicatesKey: true,
                 // Set absolute minimum power level
-                CBAdvertisementDataTxPowerLevelKey: NSNumber(value: Int8.min)
+                CBAdvertisementDataTxPowerLevelKey: NSNumber(value: Int8.min),
+                // Add immediate notification option
+                CBCentralManagerScanOptionSolicitedServiceUUIDsKey: [serviceUUID]
             ]
             
             centralManager.scanForPeripherals(withServices: [serviceUUID], options: options)
@@ -242,7 +244,7 @@ extension BLEService: CBCentralManagerDelegate {
         let smoothedRSSI = Int(Double(lastValidRSSI) * (1.0 - rssiSmoothingFactor) + Double(rawRSSIValue) * rssiSmoothingFactor)
         
         // Check if the reading is consistent with the last one
-        if abs(smoothedRSSI - lastValidRSSI) <= 3 {
+        if abs(smoothedRSSI - lastValidRSSI) <= 5 { // Increased tolerance from 3 to 5
             consecutiveValidReadings += 1
         } else {
             consecutiveValidReadings = 0
@@ -267,7 +269,7 @@ extension BLEService: CBCentralManagerDelegate {
             if !isInRange && shouldTriggerHaptic {
                 DispatchQueue.main.async {
                     self.isInRange = true
-                    self.hapticEngine.impactOccurred()
+                    self.hapticEngine.impactOccurred(intensity: 0.8)
                     self.lastHapticTime = nowTime
                     print("Triggered haptic feedback")
                 }
