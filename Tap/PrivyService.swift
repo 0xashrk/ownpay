@@ -299,28 +299,29 @@ class PrivyService: ObservableObject {
         let nonce: String
         if let response = nonceResponse as? [String: Any],
            let result = response["result"] as? String {
-            nonce = result
+            // Convert hex nonce to number
+            let nonceHex = result.dropFirst(2) // Remove "0x" prefix
+            if let nonceNumber = UInt64(nonceHex, radix: 16) {
+                // If nonce is 0, use 1 instead
+                nonce = toHexString(nonceNumber == 0 ? 1 : nonceNumber)
+            } else {
+                nonce = "0x1" // Default to 1 if parsing fails
+            }
         } else {
-            nonce = "0x0"
+            nonce = "0x1" // Default to 1 if no response
         }
         print("Got nonce: \(nonce)")
 
-        // Create the transfer data for the MON token contract
-        let transferData = "0xa9059cbb" + // transfer function signature
-            "000000000000000000000000" + defaultRecipientAddress.dropFirst(2) + // recipient address
-            "0000000000000000000000000000000000000000000000005af3107a4000" // amount in hex (100000000000000)
-
         // Create transaction object with EIP-1559 parameters
         let tx = [
-            "value": "0x0", // No ETH value needed for token transfer
-            "to": monTokenAddress, // MON token contract address
+            "value": toHexString(2000000000000000000), // 2.0 MON in wei
+            "to": defaultRecipientAddress, // Send directly to recipient address
             "chainId": "0x279f", // Monad testnet chainId
             "from": wallet.address, // logged in user's embedded wallet address
-            "gas": toHexString(100000), // Higher gas limit for token transfer
-            "maxFeePerGas": toHexString(1000000000000), // 1 Gwei
-            "maxPriorityFeePerGas": toHexString(500000000000), // 0.5 Gwei
-            "nonce": nonce,
-            "data": transferData // The encoded transfer function call
+            "gas": toHexString(21000), // Standard gas limit for native token transfer
+            "maxFeePerGas": toHexString(52000000000), // 52 Gwei
+            "maxPriorityFeePerGas": toHexString(52000000000), // 52 Gwei
+            "nonce": nonce
         ]
 
         // Convert transaction to JSON string
