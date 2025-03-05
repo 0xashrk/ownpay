@@ -240,7 +240,7 @@ struct WalletView: View {
                 SendMonForm { recipientAddress, amount in
                     Task {
                         do {
-                            try await privyService.sendTransaction()
+                            try await privyService.sendTransaction(amount: amount, to: recipientAddress)
                         } catch {
                             print("Error sending transaction: \(error)")
                         }
@@ -280,7 +280,7 @@ struct WalletView: View {
     private func sendMon() {
         Task {
             do {
-                try await privyService.sendTransaction()
+                try await privyService.sendTransaction(amount: privyService.defaultAmount, to: privyService.defaultRecipientAddress)
             } catch {
                 print("Error sending transaction: \(error)")
             }
@@ -460,7 +460,7 @@ struct SendMonForm: View {
                     if let amountDouble = Double(amount) {
                         Task {
                             do {
-                                try await privyService.sendTransaction()
+                                try await privyService.sendTransaction(amount: amountDouble, to: recipientAddress)
                             } catch {
                                 print("Error sending transaction: \(error)")
                             }

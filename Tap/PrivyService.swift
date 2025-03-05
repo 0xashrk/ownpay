@@ -285,7 +285,7 @@ class PrivyService: ObservableObject {
     }
     
     @MainActor
-    func sendTransaction() async throws {
+    func sendTransaction(amount: Double, to recipientAddress: String) async throws {
         guard case .connected(let wallets) = privy.embeddedWallet.embeddedWalletState else {
             print("Wallet not connected")
             return
@@ -317,10 +317,13 @@ class PrivyService: ObservableObject {
         func sendTransactionWithNonce(_ nonce: String) async throws -> String {
             let provider = try privy.embeddedWallet.getEthereumProvider(for: wallet.address)
             
+            // Convert amount to wei (1 MON = 1e18 wei)
+            let amountInWei = UInt64(amount * 1e18)
+            
             // Create transaction object with EIP-1559 parameters
             let tx = [
-                "value": toHexString(2000000000000000000), // 2.0 MON in wei
-                "to": defaultRecipientAddress, // Send directly to recipient address
+                "value": toHexString(amountInWei), // Use the provided amount
+                "to": recipientAddress, // Use the provided recipient address
                 "chainId": "0x279f", // Monad testnet chainId
                 "from": wallet.address, // logged in user's embedded wallet address
                 "gas": toHexString(21000), // Standard gas limit for native token transfer
