@@ -19,7 +19,7 @@ struct BalanceView: View {
             // Card
             VStack(spacing: 32) {
                 // Top section with logo and account button
-                HStack {
+                HStack(spacing: 0) {
                     Image("monad-logo")
                         .resizable()
                         .scaledToFit()
@@ -29,16 +29,13 @@ struct BalanceView: View {
                         Button {
                             showingAccountSheet = true
                         } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "ellipsis.circle.fill")
-                                    .symbolRenderingMode(.hierarchical)
-                                    .font(.system(size: 22))
-                                    .foregroundStyle(monadOffWhite.opacity(0.8))
-                            }
-                            .padding(8)
-                            .background(monadOffWhite.opacity(0.1))
-                            .clipShape(Circle())
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(monadOffWhite.opacity(0.8))
+                                .frame(width: 32, height: 32)
+                                .contentShape(Rectangle())
                         }
+                        .padding(.trailing, -8) // Negative padding to align with card edge
                     }
                 }
                 
