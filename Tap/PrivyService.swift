@@ -259,17 +259,19 @@ class PrivyService: ObservableObject {
             let balance = Double(UInt64(hexString, radix: 16) ?? 0) / 1e18
             print("Converted balance: \(balance) MON")
             
+            // Update balance on main thread
+            self.balance = String(format: "%.4f MON", balance)
+            self.monBalance = nil // Clear MON balance since it's the same as native balance
+            
+            // Force UI update
             await MainActor.run {
-                self.balance = String(format: "%.4f MON", balance)
-                self.monBalance = nil // Clear MON balance since it's the same as native balance
+                self.objectWillChange.send()
             }
         } catch {
             print("Error fetching balance: \(error)")
             print("Error details: \(String(describing: error))")
-            await MainActor.run {
-                self.balance = "Error"
-                self.monBalance = nil
-            }
+            self.balance = "Error"
+            self.monBalance = nil
         }
     }
     
@@ -277,6 +279,8 @@ class PrivyService: ObservableObject {
     @MainActor
     func refreshBalance() async {
         print("Refreshing balance...")
+        // Add a small delay to ensure network has processed any pending transactions
+        try? await Task.sleep(nanoseconds: 1 * 1_000_000_000) // 1 second
         await fetchBalance()
     }
     
@@ -388,6 +392,12 @@ class PrivyService: ObservableObject {
             do {
                 let txHash = try await sendTransactionWithNonce(currentNonce)
                 print("Transaction sent successfully: \(txHash)")
+                
+                // Wait a short delay to allow the transaction to be processed
+                try await Task.sleep(nanoseconds: 2 * 1_000_000_000) // 2 seconds
+                
+                // Refresh the balance after successful transaction
+                await fetchBalance()
                 return
             } catch WalletError.rpcError(let message) where message.contains("Nonce too low") {
                 // Extract the next nonce from the error message
