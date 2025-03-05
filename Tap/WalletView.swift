@@ -148,7 +148,7 @@ struct WalletView: View {
                 }
             }
             .sheet(isPresented: $showingRequestForm) {
-                RequestPaymentForm(amount: $amount) { amount in
+                RequestPaymentFormView(amount: $amount) { amount in
                     if let walletAddress = privyService.walletAddress {
                         bleService.broadcastPaymentRequest(amount: amount, walletAddress: walletAddress)
                     }
@@ -319,35 +319,6 @@ struct PaymentSuccessView: View {
         .padding(30)
         .background(.ultraThinMaterial)
         .cornerRadius(20)
-    }
-}
-
-struct RequestPaymentForm: View {
-    @Binding var amount: String
-    let onRequest: (Double) -> Void
-    @Environment(\.dismiss) var dismiss
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Request Amount")) {
-                    TextField("Amount (MON)", text: $amount)
-                        .keyboardType(.decimalPad)
-                }
-            }
-            .navigationTitle("Request Payment")
-            .navigationBarItems(
-                leading: Button("Cancel") {
-                    dismiss()
-                },
-                trailing: Button("Request") {
-                    if let amountDouble = Double(amount) {
-                        onRequest(amountDouble)
-                    }
-                }
-                .disabled(amount.isEmpty)
-            )
-        }
     }
 }
 
