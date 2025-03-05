@@ -98,11 +98,20 @@ class BLEService: NSObject, ObservableObject {
     }
     
     func broadcastPaymentRequest(amount: Double, walletAddress: String) {
+        // First ensure we're in a clean state
+        stopAdvertising()
+        disconnect()
+        characteristic = nil
+        peripheralCharacteristic = nil
+        receivedMessage = nil
+        connectionState = .disconnected
+        isInRange = false
+        
         // Create payment request message
         let message = "PAYMENT_REQUEST:\(amount):\(walletAddress)"
         pendingPaymentRequest = message
         
-        // Start advertising to make this device discoverable
+        // Start fresh advertising
         startAdvertising()
     }
     
@@ -244,6 +253,12 @@ extension BLEService: CBCentralManagerDelegate {
         // Filter out invalid RSSI readings
         guard rawRSSIValue != invalidRSSI else {
             print("Ignoring invalid RSSI reading")
+            return
+        }
+        
+        // Don't process if we already have a received message (prevents reconnection after response)
+        if receivedMessage?.starts(with: "PAYMENT_RESPONSE:") == true {
+            print("Payment already processed, ignoring discovery")
             return
         }
         
@@ -437,10 +452,12 @@ extension BLEService: CBPeripheralManagerDelegate {
     
     func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral, didSubscribeTo characteristic: CBCharacteristic) {
         print("Central subscribed to characteristic")
-        // Send pending payment request if we have one
+        // Only send the payment request if we haven't sent it to this central yet
         if let message = pendingPaymentRequest,
            let data = message.data(using: .utf8),
-           let peripheralChar = peripheralCharacteristic {
+           let peripheralChar = peripheralCharacteristic,
+           receivedMessage == nil { // Only send if we haven't received a response
+            print("Sending payment request to new subscriber")
             peripheralManager.updateValue(data, for: peripheralChar, onSubscribedCentrals: [central])
         }
     }
