@@ -124,52 +124,6 @@ struct WalletView: View {
                                 }
                         }
                     }
-                    
-                    // Logout Button
-                    Button(action: {
-                        isLoggingOut = true
-                        logoutError = nil
-                        Task {
-                            do {
-                                // Clean up communication services
-                                bleService.disconnect()
-                                bleService.stopScanning()
-                                bleService.stopAdvertising()
-                                
-                                // Logout from Privy
-                                try await privyService.logout()
-                                
-                                // Update login state
-                                isLoggedIn = false
-                            } catch {
-                                logoutError = "Failed to logout: \(error.localizedDescription)"
-                                print("Logout error: \(error)")
-                            }
-                            isLoggingOut = false
-                        }
-                    }) {
-                        if isLoggingOut {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        } else {
-                            Text("Logout")
-                                .font(.headline)
-                        }
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.red)
-                    .cornerRadius(10)
-                    .disabled(isLoggingOut)
-                    .padding()
-                    
-                    if let error = logoutError {
-                        Text(error)
-                            .foregroundColor(.red)
-                            .font(.caption)
-                            .padding(.horizontal)
-                    }
                 }
                 .padding()
             }
@@ -184,6 +138,15 @@ struct WalletView: View {
                 }
             }
             .navigationTitle("Wallet")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    NavigationLink {
+                        SettingsView(privyService: privyService, bleService: bleService, isLoggedIn: $isLoggedIn)
+                    } label: {
+                        Image(systemName: "gear")
+                    }
+                }
+            }
             .sheet(isPresented: $showingRequestForm) {
                 RequestPaymentForm(amount: $amount) { amount in
                     if let walletAddress = privyService.walletAddress {
