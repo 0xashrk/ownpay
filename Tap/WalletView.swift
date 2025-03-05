@@ -25,103 +25,32 @@ struct WalletView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                // Wallet Address Section
-                VStack(spacing: 8) {
-                    Text("Your Wallet")
-                        .font(.headline)
-                    if let address = privyService.walletAddress {
-                        VStack(spacing: 4) {
-                            Text(address)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            
-                            if let balance = privyService.balance {
-                                Text(balance)
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-                            } else {
-                                Text("Fetching balance...")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    } else {
-                        Text("Connecting wallet...")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Wallet Address Section
+                    BalanceView()
+                    
+                    // Mode Toggle with haptic
+                    Picker("Mode", selection: $isMerchantMode) {
+                        Text("Customer").tag(false)
+                        Text("Merchant").tag(true)
                     }
-                }
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color.blue.opacity(0.1))
-                .cornerRadius(10)
-                .task {
-                    // Ensure wallet is connected before fetching balance
-                    if privyService.walletAddress != nil {
-                        if case .notConnected = privyService.embeddedWalletState {
-                            print("Connecting wallet before fetching balance...")
-                            await privyService.connectWallet()
-                        }
-                        await privyService.fetchBalance()
-                    }
-                }
-                .refreshable {
-                    // Ensure wallet is connected on manual refresh
-                    if case .notConnected = privyService.embeddedWalletState {
-                        print("Connecting wallet before refreshing balance...")
-                        await privyService.connectWallet()
-                    }
-                    await privyService.fetchBalance()
-                }
-                
-                // Mode Toggle with haptic
-                Picker("Mode", selection: $isMerchantMode) {
-                    Text("Customer").tag(false)
-                    Text("Merchant").tag(true)
-                }
-                .pickerStyle(SegmentedPickerStyle())
-                .padding(.horizontal)
-                .onChange(of: isMerchantMode) { _ in
-                    selectionGenerator.selectionChanged()
-                }
-                
-                if isMerchantMode {
-                    // Merchant View
-                    Button(action: {
-                        selectionGenerator.selectionChanged()
-                        showingRequestForm = true
-                    }) {
-                        HStack {
-                            Image(systemName: "dollarsign.circle.fill")
-                                .font(.system(size: 24))
-                            Text("Request Payment")
-                                .font(.headline)
-                        }
-                        .foregroundColor(.blue)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue.opacity(0.1))
-                        .cornerRadius(15)
-                    }
+                    .pickerStyle(SegmentedPickerStyle())
                     .padding(.horizontal)
-                } else {
-                    // Customer View - shows status and send button
-                    VStack(spacing: 16) {
-                        Text("Scanning for payment requests...")
-                            .foregroundColor(.secondary)
-                            .padding(.top)
-                        
+                    .onChange(of: isMerchantMode) { _ in
+                        selectionGenerator.selectionChanged()
+                    }
+                    
+                    if isMerchantMode {
+                        // Merchant View
                         Button(action: {
                             selectionGenerator.selectionChanged()
-                            showingSendForm = true
+                            showingRequestForm = true
                         }) {
                             HStack {
-                                Image(systemName: "paperplane.fill")
+                                Image(systemName: "dollarsign.circle.fill")
                                     .font(.system(size: 24))
-                                Text("Send MON")
+                                Text("Request Payment")
                                     .font(.headline)
                             }
                             .foregroundColor(.blue)
@@ -131,102 +60,129 @@ struct WalletView: View {
                             .cornerRadius(15)
                         }
                         .padding(.horizontal)
+                    } else {
+                        // Customer View - shows status and send button
+                        VStack(spacing: 16) {
+                            Text("Scanning for payment requests...")
+                                .foregroundColor(.secondary)
+                                .padding(.top)
+                            
+                            Button(action: {
+                                selectionGenerator.selectionChanged()
+                                showingSendForm = true
+                            }) {
+                                HStack {
+                                    Image(systemName: "paperplane.fill")
+                                        .font(.system(size: 24))
+                                    Text("Send MON")
+                                        .font(.headline)
+                                }
+                                .foregroundColor(.blue)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.blue.opacity(0.1))
+                                .cornerRadius(15)
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
+                    
+                    // Payment Requests (visible to customer)
+                    if !isMerchantMode, let message = bleService.receivedMessage {
+                        PaymentRequestCard(message: message, bleService: bleService, onPaymentAction: { approved in
+                            if approved {
+                                playPaymentSound()
+                                paymentSuccessGenerator.notificationOccurred(.success)
+                                withAnimation {
+                                    showingPaymentSuccess = true
+                                }
+                                // Hide success message after 2 seconds
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                    withAnimation {
+                                        showingPaymentSuccess = false
+                                    }
+                                }
+                            } else {
+                                paymentSuccessGenerator.notificationOccurred(.error)
+                            }
+                        })
+                        .padding(.horizontal)
+                    }
+                    
+                    // Payment Responses (visible to merchant)
+                    if isMerchantMode, let message = bleService.receivedMessage {
+                        if message.starts(with: "PAYMENT_RESPONSE:") {
+                            PaymentResponseCard(message: message)
+                                .padding(.horizontal)
+                                .onAppear {
+                                    if message.contains("APPROVED") {
+                                        playPaymentSound()
+                                        paymentSuccessGenerator.notificationOccurred(.success)
+                                    } else {
+                                        paymentSuccessGenerator.notificationOccurred(.error)
+                                    }
+                                }
+                        }
+                    }
+                    
+                    // Logout Button
+                    Button(action: {
+                        isLoggingOut = true
+                        logoutError = nil
+                        Task {
+                            do {
+                                // Clean up communication services
+                                bleService.disconnect()
+                                bleService.stopScanning()
+                                bleService.stopAdvertising()
+                                
+                                // Logout from Privy
+                                try await privyService.logout()
+                                
+                                // Update login state
+                                isLoggedIn = false
+                            } catch {
+                                logoutError = "Failed to logout: \(error.localizedDescription)"
+                                print("Logout error: \(error)")
+                            }
+                            isLoggingOut = false
+                        }
+                    }) {
+                        if isLoggingOut {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        } else {
+                            Text("Logout")
+                                .font(.headline)
+                        }
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.red)
+                    .cornerRadius(10)
+                    .disabled(isLoggingOut)
+                    .padding()
+                    
+                    if let error = logoutError {
+                        Text(error)
+                            .foregroundColor(.red)
+                            .font(.caption)
+                            .padding(.horizontal)
                     }
                 }
-                
-                // Payment Requests (visible to customer)
-                if !isMerchantMode, let message = bleService.receivedMessage {
-                    PaymentRequestCard(message: message, bleService: bleService, onPaymentAction: { approved in
-                        if approved {
-                            playPaymentSound()
-                            paymentSuccessGenerator.notificationOccurred(.success)
-                            withAnimation {
-                                showingPaymentSuccess = true
-                            }
-                            // Hide success message after 2 seconds
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                withAnimation {
-                                    showingPaymentSuccess = false
-                                }
-                            }
-                        } else {
-                            paymentSuccessGenerator.notificationOccurred(.error)
-                        }
-                    })
-                    .padding(.horizontal)
-                }
-                
-                // Success overlay
+                .padding()
+            }
+            .refreshable {
+                // Refresh balance when pulling down
+                await privyService.fetchBalance()
+            }
+            .overlay {
                 if showingPaymentSuccess {
                     PaymentSuccessView()
                         .transition(.scale.combined(with: .opacity))
                 }
-                
-                // Payment Responses (visible to merchant)
-                if isMerchantMode, let message = bleService.receivedMessage {
-                    if message.starts(with: "PAYMENT_RESPONSE:") {
-                        PaymentResponseCard(message: message)
-                            .padding(.horizontal)
-                            .onAppear {
-                                if message.contains("APPROVED") {
-                                    playPaymentSound()
-                                    paymentSuccessGenerator.notificationOccurred(.success)
-                                } else {
-                                    paymentSuccessGenerator.notificationOccurred(.error)
-                                }
-                            }
-                    }
-                }
-                
-                Spacer()
-                
-                // Logout Button
-                Button(action: {
-                    isLoggingOut = true
-                    logoutError = nil
-                    Task {
-                        do {
-                            // Clean up communication services
-                            bleService.disconnect()
-                            bleService.stopScanning()
-                            bleService.stopAdvertising()
-                            
-                            // Logout from Privy
-                            try await privyService.logout()
-                            
-                            // Update login state
-                            isLoggedIn = false
-                        } catch {
-                            logoutError = "Failed to logout: \(error.localizedDescription)"
-                            print("Logout error: \(error)")
-                        }
-                        isLoggingOut = false
-                    }
-                }) {
-                    if isLoggingOut {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    } else {
-                        Text("Logout")
-                            .font(.headline)
-                    }
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.red)
-                .cornerRadius(10)
-                .disabled(isLoggingOut)
-                .padding()
-                
-                if let error = logoutError {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .font(.caption)
-                        .padding(.horizontal)
-                }
             }
-            .padding()
             .navigationTitle("Wallet")
             .sheet(isPresented: $showingRequestForm) {
                 RequestPaymentForm(amount: $amount) { amount in
