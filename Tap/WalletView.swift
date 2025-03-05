@@ -230,6 +230,7 @@ struct PaymentRequestCard: View {
                         
                     HStack(spacing: 20) {
                         Button(action: {
+                            bleService.stopAdvertising() // Stop broadcasting
                             bleService.sendPaymentResponse(approved: false)
                             onPaymentAction(false)
                         }) {
@@ -249,11 +250,13 @@ struct PaymentRequestCard: View {
                                     do {
                                         try await privyService.sendTransaction(amount: amount, to: recipientAddress)
                                         // Only send the response after transaction is successful
+                                        bleService.stopAdvertising() // Stop broadcasting
                                         bleService.sendPaymentResponse(approved: true)
                                         onPaymentAction(true)
                                     } catch {
                                         print("Error sending transaction: \(error)")
                                         // Send declined response if transaction fails
+                                        bleService.stopAdvertising() // Stop broadcasting
                                         bleService.sendPaymentResponse(approved: false)
                                         onPaymentAction(false)
                                     }
@@ -323,17 +326,6 @@ struct RequestPaymentForm: View {
     @Binding var amount: String
     let onRequest: (Double) -> Void
     @Environment(\.dismiss) var dismiss
-    
-    init(amount: Binding<String>, onRequest: @escaping (Double) -> Void) {
-        self._amount = amount
-        self.onRequest = onRequest
-        // Set default amount to "1"
-        if amount.wrappedValue.isEmpty {
-            DispatchQueue.main.async {
-                amount.wrappedValue = "1"
-            }
-        }
-    }
     
     var body: some View {
         NavigationView {

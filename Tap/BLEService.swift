@@ -107,23 +107,28 @@ class BLEService: NSObject, ObservableObject {
     }
     
     func sendPaymentResponse(approved: Bool) {
-        // Create payment response message
+        // Create and send payment response message
         let message = "PAYMENT_RESPONSE:\(approved ? "APPROVED" : "DECLINED")"
         sendMessage(message)
         
-        // Clear state and restart scanning for new requests
-        DispatchQueue.main.async {
-            print("Payment response sent, cleaning up...")
+        // Stop scanning immediately to prevent receiving more advertisements
+        stopScanning()
+        
+        // Wait briefly to ensure the message is sent before cleanup
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            // Full cleanup
             self.receivedMessage = nil
-            
-            // Force a proper cleanup and restart
-            self.disconnect()
-            self.stopScanning()
             self.characteristic = nil
+            self.peripheralCharacteristic = nil
+            self.pendingPaymentRequest = nil
+            self.isInRange = false
+            
+            print("Payment response sent, cleaning up...")
+            self.disconnect()  // This will handle stopping scan/advertising
             self.connectionState = .disconnected
             
-            // Ensure we're in a clean state before restarting scan
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            // Only restart scanning after ensuring complete disconnection
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 print("Restarting scan for new payment requests...")
                 self.startScanning()
             }
@@ -158,14 +163,14 @@ class BLEService: NSObject, ObservableObject {
         if let characteristic = characteristic {
             // If we have a characteristic, we're the central (customer)
             connectedPeripheral?.writeValue(data, for: characteristic, type: .withResponse)
-        } else {
+        } else if let peripheralChar = peripheralCharacteristic {
             // If we don't have a characteristic, we're the peripheral (merchant)
             // Update value and notify subscribers
-            peripheralManager.updateValue(data, for: self.peripheralCharacteristic, onSubscribedCentrals: nil)
+            peripheralManager.updateValue(data, for: peripheralChar, onSubscribedCentrals: nil)
         }
     }
     
-    private var peripheralCharacteristic: CBMutableCharacteristic!
+    private var peripheralCharacteristic: CBMutableCharacteristic?
     
     private func setupService() {
         // Create the service
@@ -180,16 +185,18 @@ class BLEService: NSObject, ObservableObject {
         )
         
         // Add the characteristic to the service
-        service.characteristics = [peripheralCharacteristic]
-        
-        // Add the service to the peripheral manager
-        peripheralManager.removeAllServices()
-        peripheralManager.add(service)
-        
-        // If we have a pending payment request, send it
-        if let message = pendingPaymentRequest,
-           let data = message.data(using: .utf8) {
-            peripheralManager.updateValue(data, for: peripheralCharacteristic, onSubscribedCentrals: nil)
+        if let peripheralChar = peripheralCharacteristic {
+            service.characteristics = [peripheralChar]
+            
+            // Add the service to the peripheral manager
+            peripheralManager.removeAllServices()
+            peripheralManager.add(service)
+            
+            // If we have a pending payment request, send it
+            if let message = pendingPaymentRequest,
+               let data = message.data(using: .utf8) {
+                peripheralManager.updateValue(data, for: peripheralChar, onSubscribedCentrals: nil)
+            }
         }
     }
 }
@@ -390,22 +397,41 @@ extension BLEService: CBPeripheralManagerDelegate {
                 // Handle both approved and declined responses
                 if message.starts(with: "PAYMENT_RESPONSE:") {
                     let isApproved = message.contains("APPROVED")
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        self.receivedMessage = nil
-                        self.stopAdvertising() // Stop advertising regardless of response
+                    
+                    // Update UI immediately with the response
+                    DispatchQueue.main.async {
+                        self.receivedMessage = message
+                    }
+                    
+                    // Respond to the request
+                    peripheral.respond(to: request, withResult: .success)
+                    
+                    // Cleanup after ensuring message is delivered
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        // Stop advertising first
+                        self.stopAdvertising()
                         
-                        // If payment was declined, also clear the pending request
-                        if !isApproved {
-                            self.pendingPaymentRequest = nil
+                        // Then clean up everything else
+                        self.pendingPaymentRequest = nil
+                        self.characteristic = nil
+                        self.peripheralCharacteristic = nil
+                        self.connectionState = .disconnected
+                        self.isInRange = false
+                        
+                        // Clear the received message after showing it briefly
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                            self.receivedMessage = nil
                         }
                     }
+                    return // Exit early after handling payment response
                 }
                 
+                // For other messages
                 DispatchQueue.main.async {
                     self.receivedMessage = message
                 }
+                peripheral.respond(to: request, withResult: .success)
             }
-            peripheral.respond(to: request, withResult: .success)
         }
     }
     
@@ -413,8 +439,9 @@ extension BLEService: CBPeripheralManagerDelegate {
         print("Central subscribed to characteristic")
         // Send pending payment request if we have one
         if let message = pendingPaymentRequest,
-           let data = message.data(using: .utf8) {
-            peripheralManager.updateValue(data, for: peripheralCharacteristic, onSubscribedCentrals: [central])
+           let data = message.data(using: .utf8),
+           let peripheralChar = peripheralCharacteristic {
+            peripheralManager.updateValue(data, for: peripheralChar, onSubscribedCentrals: [central])
         }
     }
 } 
