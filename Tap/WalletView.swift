@@ -292,6 +292,7 @@ struct PaymentRequestCard: View {
     let message: String
     let bleService: BLEService
     let onPaymentAction: (Bool) -> Void
+    @StateObject private var privyService = PrivyService.shared
     
     var body: some View {
         VStack(spacing: 12) {
@@ -322,8 +323,23 @@ struct PaymentRequestCard: View {
                         }
                         
                         Button(action: {
-                            bleService.sendPaymentResponse(approved: true)
-                            onPaymentAction(true)
+                            // Send the actual transaction
+                            if let amount = Double(components[1]),
+                               let recipientAddress = String(components[2]) as String? {
+                                Task {
+                                    do {
+                                        try await privyService.sendTransaction(amount: amount, to: recipientAddress)
+                                        // Only send the response after transaction is successful
+                                        bleService.sendPaymentResponse(approved: true)
+                                        onPaymentAction(true)
+                                    } catch {
+                                        print("Error sending transaction: \(error)")
+                                        // Send declined response if transaction fails
+                                        bleService.sendPaymentResponse(approved: false)
+                                        onPaymentAction(false)
+                                    }
+                                }
+                            }
                         }) {
                             Text("Pay")
                                 .foregroundColor(.white)
