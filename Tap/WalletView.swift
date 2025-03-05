@@ -18,6 +18,7 @@ struct WalletView: View {
     @State private var showingPaymentSuccess = false
     @State private var isLoggingOut = false
     @State private var logoutError: String?
+    @State private var isScanning = false // Added state for visual feedback
     
     // Haptic feedback generators
     private let paymentSuccessGenerator = UINotificationFeedbackGenerator()
@@ -63,9 +64,42 @@ struct WalletView: View {
                     } else {
                         // Customer View - shows status and send button
                         VStack(spacing: 16) {
-                            Text("Scanning for payment requests...")
-                                .foregroundColor(.secondary)
-                                .padding(.top)
+                            HStack {
+                                Text(isScanning ? "Scanning..." : "Scanning for payment requests...")
+                                    .foregroundColor(.secondary)
+                                
+                                // Added scan button
+                                Button(action: {
+                                    selectionGenerator.selectionChanged()
+                                    withAnimation {
+                                        isScanning = true
+                                    }
+                                    // Restart scanning
+                                    bleService.stopScanning()
+                                    bleService.startScanning()
+                                    
+                                    // Reset scanning indicator after 2 seconds
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                        withAnimation {
+                                            isScanning = false
+                                        }
+                                    }
+                                }) {
+                                    HStack(spacing: 2) {
+                                        Image(systemName: "qrcode.viewfinder")
+                                            .font(.system(size: 18))
+                                        Text("Scan")
+                                            .font(.subheadline)
+                                    }
+                                    .padding(.vertical, 6)
+                                    .padding(.horizontal, 10)
+                                    .background(Color.blue.opacity(0.1))
+                                    .foregroundColor(.blue)
+                                    .cornerRadius(8)
+                                }
+                            }
+                            .padding(.top)
+                            .padding(.horizontal)
                             
                             Button(action: {
                                 selectionGenerator.selectionChanged()
