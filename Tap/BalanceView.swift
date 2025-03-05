@@ -104,7 +104,6 @@ struct MerchantBalanceView: View {
                         .resizable()
                         .scaledToFit()
                         .frame(height: 12)
-                        .colorMultiply(cyberpunkCyan)
                     Spacer()
                     if privyService.walletAddress != nil {
                         Button {
