@@ -19,6 +19,8 @@ struct WalletView: View {
     @State private var isLoggingOut = false
     @State private var logoutError: String?
     @State private var isScanning = false // Added state for visual feedback
+    @State private var processedRequests = Set<String>() // Track processed payment requests
+    @State private var scanTimer: Timer? = nil
     
     // Haptic feedback generators
     private let paymentSuccessGenerator = UINotificationFeedbackGenerator()
@@ -40,6 +42,7 @@ struct WalletView: View {
                     .padding(.horizontal)
                     .onChange(of: isMerchantMode) { _ in
                         selectionGenerator.selectionChanged()
+                        processedRequests.removeAll() // Clear processed requests when mode changes
                     }
                     
                     if isMerchantMode {
@@ -122,8 +125,13 @@ struct WalletView: View {
                     }
                     
                     // Payment Requests (visible to customer)
-                    if !isMerchantMode, let message = bleService.receivedMessage {
+                    if !isMerchantMode, let message = bleService.receivedMessage, !hasProcessedRequest(message) {
                         PaymentRequestCard(message: message, bleService: bleService, onPaymentAction: { approved in
+                            // Mark this request as processed
+                            if let requestId = extractRequestId(from: message) {
+                                processedRequests.insert(requestId)
+                            }
+                            
                             if approved {
                                 playPaymentSound()
                                 paymentSuccessGenerator.notificationOccurred(.success)
@@ -138,6 +146,16 @@ struct WalletView: View {
                                 }
                             } else {
                                 paymentSuccessGenerator.notificationOccurred(.error)
+                            }
+                            
+                            // Clear message and restart scanning after processing
+                            bleService.receivedMessage = nil
+                            
+                            // Restart scanning after a short delay
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                if !isMerchantMode {
+                                    bleService.startScanning()
+                                }
                             }
                         })
                         .padding(.horizontal)
@@ -154,6 +172,11 @@ struct WalletView: View {
                                         paymentSuccessGenerator.notificationOccurred(.success)
                                     } else {
                                         paymentSuccessGenerator.notificationOccurred(.error)
+                                    }
+                                    
+                                    // Clear payment response after displaying
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                        bleService.receivedMessage = nil
                                     }
                                 }
                         }
@@ -202,6 +225,10 @@ struct WalletView: View {
                 }
             }
             .onChange(of: isMerchantMode) { newValue in
+                // Stop existing scanning timer
+                scanTimer?.invalidate()
+                scanTimer = nil
+                
                 if newValue {
                     // Merchant mode: stop scanning
                     bleService.stopScanning()
@@ -210,10 +237,21 @@ struct WalletView: View {
                     // Customer mode: start scanning, stop advertising
                     bleService.stopAdvertising()
                     bleService.startScanning()
+                    
+                    // Start periodic scanning in customer mode
+                    setupAutoScan()
+                }
+            }
+            .onAppear {
+                // Start automatic scanning when in customer mode
+                if !isMerchantMode {
+                    setupAutoScan()
                 }
             }
             .onDisappear {
                 // Clean up when view disappears
+                scanTimer?.invalidate()
+                scanTimer = nil
                 bleService.disconnect()
                 bleService.stopScanning()
                 bleService.stopAdvertising()
@@ -224,6 +262,52 @@ struct WalletView: View {
                 isLoggedIn = false
             }
         }
+    }
+    
+    // Setup auto-scan timer
+    private func setupAutoScan() {
+        // Cancel any existing timer
+        scanTimer?.invalidate()
+        
+        // Create a new timer that scans every 10 seconds
+        scanTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { _ in
+            if !isMerchantMode && bleService.receivedMessage == nil {
+                withAnimation {
+                    isScanning = true
+                }
+                
+                // Restart scanning
+                bleService.stopScanning()
+                bleService.startScanning()
+                
+                // Reset scanning indicator after 1 second
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    withAnimation {
+                        isScanning = false
+                    }
+                }
+            }
+        }
+    }
+    
+    // Extract a unique ID from a payment request message
+    private func extractRequestId(from message: String) -> String? {
+        if message.starts(with: "PAYMENT_REQUEST:") {
+            let components = message.split(separator: ":")
+            if components.count >= 3 {
+                // Create a unique ID from amount and address
+                return "\(components[1]):\(components[2])"
+            }
+        }
+        return nil
+    }
+    
+    // Check if a payment request has already been processed
+    private func hasProcessedRequest(_ message: String) -> Bool {
+        guard let requestId = extractRequestId(from: message) else {
+            return false
+        }
+        return processedRequests.contains(requestId)
     }
     
     private func playPaymentSound() {
