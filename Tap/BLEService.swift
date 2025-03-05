@@ -52,13 +52,9 @@ class BLEService: NSObject, ObservableObject {
             isScanning = true
             connectionState = .disconnected
             
-            // Add RSSI filter and minimum power options
+            // Modified: Simplified scanning options to avoid warnings
             let options: [String: Any] = [
-                CBCentralManagerScanOptionAllowDuplicatesKey: true,
-                // Set absolute minimum power level
-                CBAdvertisementDataTxPowerLevelKey: NSNumber(value: Int8.min),
-                // Add immediate notification option
-                CBCentralManagerScanOptionSolicitedServiceUUIDsKey: [serviceUUID]
+                CBCentralManagerScanOptionAllowDuplicatesKey: true
             ]
             
             centralManager.scanForPeripherals(withServices: [serviceUUID], options: options)
@@ -81,12 +77,10 @@ class BLEService: NSObject, ObservableObject {
         // Create the service if not already created
         setupService()
         
-        // Add absolute minimum power level to reduce range
+        // Modified: Removed the CBAdvertisementDataTxPowerLevelKey to avoid warnings
         let advertisementData: [String: Any] = [
             CBAdvertisementDataServiceUUIDsKey: [serviceUUID],
-            CBAdvertisementDataLocalNameKey: "Tap Payment",
-            // Set absolute minimum power level
-            CBAdvertisementDataTxPowerLevelKey: NSNumber(value: Int8.min)
+            CBAdvertisementDataLocalNameKey: "Tap Payment"
         ]
         peripheralManager.startAdvertising(advertisementData)
     }
