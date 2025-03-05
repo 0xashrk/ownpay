@@ -213,7 +213,11 @@ class PrivyService: ObservableObject {
     
     @MainActor
     func fetchBalance() async {
-        guard let address = walletAddress else { return }
+        guard let address = walletAddress else {
+            print("No wallet address available")
+            self.balance = "No wallet"
+            return
+        }
         
         do {
             print("Fetching balance for address: \(address)")
@@ -257,11 +261,6 @@ class PrivyService: ObservableObject {
             
             await MainActor.run {
                 self.balance = String(format: "%.4f MON", balance)
-            }
-            
-            // Since we're on Monad testnet, we don't need to fetch MON token balance separately
-            // as MON is the native token
-            await MainActor.run {
                 self.monBalance = nil // Clear MON balance since it's the same as native balance
             }
         } catch {
@@ -272,6 +271,13 @@ class PrivyService: ObservableObject {
                 self.monBalance = nil
             }
         }
+    }
+    
+    // Add a refresh function that can be called from the UI
+    @MainActor
+    func refreshBalance() async {
+        print("Refreshing balance...")
+        await fetchBalance()
     }
     
     @MainActor
@@ -286,95 +292,118 @@ class PrivyService: ObservableObject {
             return
         }
 
-        // First get the nonce
-        let provider = try privy.embeddedWallet.getEthereumProvider(for: wallet.address)
-        let nonceResponse = try await provider.request(
-            RpcRequest(
-                method: "eth_getTransactionCount",
-                params: [wallet.address, "latest"]
+        // Function to get the current nonce
+        func getCurrentNonce() async throws -> String {
+            let provider = try privy.embeddedWallet.getEthereumProvider(for: wallet.address)
+            let nonceResponse = try await provider.request(
+                RpcRequest(
+                    method: "eth_getTransactionCount",
+                    params: [wallet.address, "latest"]
+                )
             )
-        )
-        
-        // Extract just the nonce value from the response
-        let nonce: String
-        if let response = nonceResponse as? [String: Any],
-           let result = response["result"] as? String {
-            // Convert hex nonce to number
-            let nonceHex = result.dropFirst(2) // Remove "0x" prefix
-            if let nonceNumber = UInt64(nonceHex, radix: 16) {
-                // If nonce is 0, use 1 instead
-                nonce = toHexString(nonceNumber == 0 ? 1 : nonceNumber)
-            } else {
-                nonce = "0x1" // Default to 1 if parsing fails
+            
+            if let response = nonceResponse as? [String: Any],
+               let result = response["result"] as? String {
+                return result
             }
-        } else {
-            nonce = "0x1" // Default to 1 if no response
+            return "0x0"
         }
-        print("Got nonce: \(nonce)")
 
-        // Create transaction object with EIP-1559 parameters
-        let tx = [
-            "value": toHexString(2000000000000000000), // 2.0 MON in wei
-            "to": defaultRecipientAddress, // Send directly to recipient address
-            "chainId": "0x279f", // Monad testnet chainId
-            "from": wallet.address, // logged in user's embedded wallet address
-            "gas": toHexString(21000), // Standard gas limit for native token transfer
-            "maxFeePerGas": toHexString(52000000000), // 52 Gwei
-            "maxPriorityFeePerGas": toHexString(52000000000), // 52 Gwei
-            "nonce": nonce
-        ]
+        // Function to send transaction with a specific nonce
+        func sendTransactionWithNonce(_ nonce: String) async throws -> String {
+            let provider = try privy.embeddedWallet.getEthereumProvider(for: wallet.address)
+            
+            // Create transaction object with EIP-1559 parameters
+            let tx = [
+                "value": toHexString(2000000000000000000), // 2.0 MON in wei
+                "to": defaultRecipientAddress, // Send directly to recipient address
+                "chainId": "0x279f", // Monad testnet chainId
+                "from": wallet.address, // logged in user's embedded wallet address
+                "gas": toHexString(21000), // Standard gas limit for native token transfer
+                "maxFeePerGas": toHexString(52000000000), // 52 Gwei
+                "maxPriorityFeePerGas": toHexString(52000000000), // 52 Gwei
+                "nonce": nonce
+            ]
 
-        // Convert transaction to JSON string
-        let txData = try JSONSerialization.data(withJSONObject: tx)
-        guard let txString = String(data: txData, encoding: .utf8) else {
-            print("Failed to convert transaction to string")
-            return
-        }
-        print("Transaction data: \(txString)")
+            // Convert transaction to JSON string
+            let txData = try JSONSerialization.data(withJSONObject: tx)
+            guard let txString = String(data: txData, encoding: .utf8) else {
+                print("Failed to convert transaction to string")
+                throw WalletError.providerNotInitialized
+            }
+            print("Transaction data: \(txString)")
 
-        // Sign the transaction using the provider
-        let signedTx = try await provider.request(
-            RpcRequest(
-                method: "eth_signTransaction",
-                params: [txString]
+            // Sign the transaction using the provider
+            let signedTx = try await provider.request(
+                RpcRequest(
+                    method: "eth_signTransaction",
+                    params: [txString]
+                )
             )
-        )
 
-        guard let signedTxString = signedTx as? String else {
-            print("Failed to sign transaction")
-            return
+            guard let signedTxString = signedTx as? String else {
+                print("Failed to sign transaction")
+                throw WalletError.providerNotInitialized
+            }
+
+            print("Got signed transaction: \(signedTxString)")
+
+            // Create a direct RPC request to the Monad testnet
+            let url = URL(string: monadRPCURL)!
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            
+            let rpcRequest: [String: Any] = [
+                "jsonrpc": "2.0",
+                "method": "eth_sendRawTransaction",
+                "params": [signedTxString],
+                "id": 1
+            ]
+            
+            request.httpBody = try JSONSerialization.data(withJSONObject: rpcRequest)
+            
+            let (data, _) = try await URLSession.shared.data(for: request)
+            let responseString = String(data: data, encoding: .utf8) ?? "Could not decode response"
+            print("Received response: \(responseString)")
+            
+            // First try to decode as error response
+            if let errorResponse = try? JSONDecoder().decode(JSONRPCErrorResponse.self, from: data) {
+                print("RPC Error: \(errorResponse.error.message)")
+                throw WalletError.rpcError(errorResponse.error.message)
+            }
+            
+            // If not an error, decode as success response
+            let response = try JSONDecoder().decode(JSONRPCResponse.self, from: data)
+            return response.result
         }
 
-        print("Got signed transaction: \(signedTxString)")
+        // Get initial nonce
+        var currentNonce = try await getCurrentNonce()
+        print("Initial nonce: \(currentNonce)")
 
-        // Create a direct RPC request to the Monad testnet
-        let url = URL(string: monadRPCURL)!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let rpcRequest: [String: Any] = [
-            "jsonrpc": "2.0",
-            "method": "eth_sendRawTransaction",
-            "params": [signedTxString],
-            "id": 1
-        ]
-        
-        request.httpBody = try JSONSerialization.data(withJSONObject: rpcRequest)
-        
-        let (data, _) = try await URLSession.shared.data(for: request)
-        let responseString = String(data: data, encoding: .utf8) ?? "Could not decode response"
-        print("Received response: \(responseString)")
-        
-        // First try to decode as error response
-        if let errorResponse = try? JSONDecoder().decode(JSONRPCErrorResponse.self, from: data) {
-            print("RPC Error: \(errorResponse.error.message)")
-            throw WalletError.rpcError(errorResponse.error.message)
+        // Try to send transaction with retries for nonce errors
+        var maxRetries = 3
+        while maxRetries > 0 {
+            do {
+                let txHash = try await sendTransactionWithNonce(currentNonce)
+                print("Transaction sent successfully: \(txHash)")
+                return
+            } catch WalletError.rpcError(let message) where message.contains("Nonce too low") {
+                // Extract the next nonce from the error message
+                if let nextNonce = message.components(separatedBy: "next nonce ").last?.components(separatedBy: ",").first {
+                    print("Retrying with next nonce: \(nextNonce)")
+                    currentNonce = "0x\(String(Int(nextNonce) ?? 0, radix: 16))"
+                    maxRetries -= 1
+                } else {
+                    throw WalletError.rpcError(message)
+                }
+            } catch {
+                throw error
+            }
         }
         
-        // If not an error, decode as success response
-        let response = try JSONDecoder().decode(JSONRPCResponse.self, from: data)
-        print("Transaction sent successfully: \(response.result)")
+        throw WalletError.rpcError("Failed to send transaction after multiple nonce retries")
     }
     
     // Add this helper function
