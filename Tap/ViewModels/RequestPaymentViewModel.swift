@@ -3,11 +3,12 @@ import SwiftUI
 
 class RequestPaymentViewModel: ObservableObject {
     @Published var amount: String
-    private let onRequest: (Double) -> Void
+    @Published var note: String = ""
+    private let onRequest: (Double, String) -> Void
     
     let quickPaymentAmounts = [0.1, 0.5, 1.0, 5.0]
     
-    init(amount: Binding<String>, onRequest: @escaping (Double) -> Void) {
+    init(amount: Binding<String>, onRequest: @escaping (Double, String) -> Void) {
         self._amount = Published(initialValue: amount.wrappedValue)
         self.onRequest = onRequest
     }
@@ -18,7 +19,7 @@ class RequestPaymentViewModel: ObservableObject {
     
     func submitRequest() {
         if let amountDouble = Double(amount) {
-            onRequest(amountDouble)
+            onRequest(amountDouble, note)
         }
     }
     

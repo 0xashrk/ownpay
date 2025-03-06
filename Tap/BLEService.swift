@@ -91,7 +91,7 @@ class BLEService: NSObject, ObservableObject {
         pendingPaymentRequest = nil
     }
     
-    func broadcastPaymentRequest(amount: Double, walletAddress: String) {
+    func broadcastPaymentRequest(amount: Double, walletAddress: String, note: String = "") {
         // First ensure we're in a clean state
         stopAdvertising()
         disconnect()
@@ -102,7 +102,7 @@ class BLEService: NSObject, ObservableObject {
         isInRange = false
         
         // Create payment request message
-        let message = "PAYMENT_REQUEST:\(amount):\(walletAddress)"
+        let message = "PAYMENT_REQUEST:\(amount):\(walletAddress):\(note)"
         pendingPaymentRequest = message
         
         // Start fresh advertising
@@ -405,7 +405,7 @@ extension BLEService: CBPeripheralManagerDelegate {
                 
                 // Handle both approved and declined responses
                 if message.starts(with: "PAYMENT_RESPONSE:") {
-                    let isApproved = message.contains("APPROVED")
+                    _ = message.contains("APPROVED")
                     
                     // Update UI immediately with the response
                     DispatchQueue.main.async {

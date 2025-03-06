@@ -4,7 +4,7 @@ struct RequestPaymentFormView: View {
     @StateObject private var viewModel: RequestPaymentViewModel
     @Environment(\.dismiss) var dismiss
     
-    init(amount: Binding<String>, onRequest: @escaping (Double) -> Void) {
+    init(amount: Binding<String>, onRequest: @escaping (Double, String) -> Void) {
         _viewModel = StateObject(wrappedValue: RequestPaymentViewModel(amount: amount, onRequest: onRequest))
     }
     
@@ -44,6 +44,10 @@ struct RequestPaymentFormView: View {
                         }
                     }
                     .padding(.top, 8)
+                }
+                
+                Section(header: Text("Note (Optional)")) {
+                    TextField("What's this for? (e.g., Coffee, Lunch)", text: $viewModel.note)
                 }
             }
             .navigationTitle("Request Payment")

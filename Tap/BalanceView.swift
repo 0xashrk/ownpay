@@ -119,7 +119,7 @@ struct MerchantBalanceView: View {
                     }
                 }
                 
-                if let address = privyService.walletAddress {
+                if privyService.walletAddress != nil {
                     // Balance section
                     VStack(alignment: .leading, spacing: 12) {
                         if let balance = privyService.balance {
@@ -219,7 +219,7 @@ struct CustomerBalanceView: View {
                     }
                 }
                 
-                if let address = privyService.walletAddress {
+                if privyService.walletAddress != nil {
                     // Balance section
                     VStack(alignment: .leading, spacing: 12) {
                         if let balance = privyService.balance {

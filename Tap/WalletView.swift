@@ -208,9 +208,9 @@ struct WalletView: View {
                 }
             }
             .sheet(isPresented: $showingRequestForm) {
-                RequestPaymentFormView(amount: $amount) { amount in
+                RequestPaymentFormView(amount: $amount) { amount, note in
                     if let walletAddress = privyService.walletAddress {
-                        bleService.broadcastPaymentRequest(amount: amount, walletAddress: walletAddress)
+                        bleService.broadcastPaymentRequest(amount: amount, walletAddress: walletAddress, note: note)
                     }
                     showingRequestForm = false
                 }

@@ -35,6 +35,15 @@ struct PaymentRequestCard: View {
                             .lineLimit(1)
                             .foregroundColor(.secondary)
                         
+                        // Display note if it exists (components[3])
+                        if components.count >= 4 && !components[3].isEmpty {
+                            Text("Note: \(components[3])")
+                                .font(.subheadline)
+                                .lineLimit(2)
+                                .foregroundColor(.secondary)
+                                .padding(.top, 2)
+                        }
+                        
                         switch paymentState {
                         case .initial:
                             HStack(spacing: 20) {
@@ -213,7 +222,7 @@ struct PaymentRequestCard: View {
         .edgesIgnoringSafeArea(.all)
         
         PaymentRequestCard(
-            message: "PAYMENT_REQUEST:10:0x1234567890abcdef",
+            message: "PAYMENT_REQUEST:10:0x1234567890abcdef:Coffee",
             bleService: BLEService(),
             onPaymentAction: { _ in }
         )
