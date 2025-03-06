@@ -153,12 +153,7 @@ struct NetworkSettingsView: View {
     }
 }
 
-struct TransactionHistoryView: View {
-    var body: some View {
-        Text("Transaction History")
-            .navigationTitle("History")
-    }
-}
+// TransactionHistoryView has been moved to its own file
 
 #Preview {
     NavigationView {
