@@ -170,6 +170,9 @@ struct WalletView: View {
                                     if message.contains("APPROVED") {
                                         playPaymentSound()
                                         paymentSuccessGenerator.notificationOccurred(.success)
+                                        
+                                        // Try to fetch balance with retries
+                                        fetchBalanceWithRetry()
                                     } else {
                                         paymentSuccessGenerator.notificationOccurred(.error)
                                     }
@@ -243,6 +246,9 @@ struct WalletView: View {
                 }
             }
             .onAppear {
+                // Fetch balance with retry when view appears
+                fetchBalanceWithRetry()
+                
                 // Start automatic scanning when in customer mode
                 if !isMerchantMode {
                     setupAutoScan()
@@ -320,6 +326,31 @@ struct WalletView: View {
                 try await privyService.sendTransaction(amount: privyService.defaultAmount, to: privyService.defaultRecipientAddress)
             } catch {
                 print("Error sending transaction: \(error)")
+            }
+        }
+    }
+    
+    // Add this function to your WalletView struct
+    private func fetchBalanceWithRetry(attempts: Int = 3, delay: Double = 1.0) {
+        Task {
+            var currentAttempt = 0
+            var success = false
+            
+            while currentAttempt < attempts && !success {
+                currentAttempt += 1
+                
+                do {
+                    // Try to fetch balance
+                    await privyService.fetchBalance()
+                    success = true
+                } catch {
+                    print("Balance fetch attempt \(currentAttempt) failed: \(error)")
+                    
+                    if currentAttempt < attempts {
+                        // Wait before retrying
+                        try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    }
+                }
             }
         }
     }
