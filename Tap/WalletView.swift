@@ -330,6 +330,7 @@ struct PaymentRequestCard: View {
     let bleService: BLEService
     let onPaymentAction: (Bool) -> Void
     @StateObject private var privyService = PrivyService.shared
+    @State private var isProcessing = false
     
     var body: some View {
         VStack(spacing: 12) {
@@ -345,51 +346,71 @@ struct PaymentRequestCard: View {
                     Text("From: \(components[2])")
                         .font(.subheadline)
                         .lineLimit(1)
-                        
-                    HStack(spacing: 20) {
-                        Button(action: {
-                            bleService.stopAdvertising() // Stop broadcasting
-                            bleService.sendPaymentResponse(approved: false)
-                            onPaymentAction(false)
-                        }) {
-                            Text("Decline")
-                                .foregroundColor(.red)
-                                .padding(.vertical, 8)
-                                .padding(.horizontal, 20)
-                                .background(Color.red.opacity(0.1))
-                                .cornerRadius(8)
+                    
+                    if isProcessing {
+                        // Payment processing animation
+                        VStack {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                                .padding(.bottom, 10)
+                            
+                            Text("Processing Payment...")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
                         }
-                        
-                        Button(action: {
-                            // Send the actual transaction
-                            if let amount = Double(components[1]),
-                               let recipientAddress = String(components[2]) as String? {
-                                Task {
-                                    do {
-                                        try await privyService.sendTransaction(amount: amount, to: recipientAddress)
-                                        // Only send the response after transaction is successful
-                                        bleService.stopAdvertising() // Stop broadcasting
-                                        bleService.sendPaymentResponse(approved: true)
-                                        onPaymentAction(true)
-                                    } catch {
-                                        print("Error sending transaction: \(error)")
-                                        // Send declined response if transaction fails
-                                        bleService.stopAdvertising() // Stop broadcasting
-                                        bleService.sendPaymentResponse(approved: false)
-                                        onPaymentAction(false)
+                        .frame(height: 60)
+                        .padding(.top, 8)
+                    } else {
+                        HStack(spacing: 20) {
+                            Button(action: {
+                                bleService.stopAdvertising() // Stop broadcasting
+                                bleService.sendPaymentResponse(approved: false)
+                                onPaymentAction(false)
+                            }) {
+                                Text("Decline")
+                                    .foregroundColor(.red)
+                                    .padding(.vertical, 8)
+                                    .padding(.horizontal, 20)
+                                    .background(Color.red.opacity(0.1))
+                                    .cornerRadius(8)
+                            }
+                            
+                            Button(action: {
+                                // Start processing animation
+                                withAnimation {
+                                    isProcessing = true
+                                }
+                                
+                                // Send the actual transaction
+                                if let amount = Double(components[1]),
+                                   let recipientAddress = String(components[2]) as String? {
+                                    Task {
+                                        do {
+                                            try await privyService.sendTransaction(amount: amount, to: recipientAddress)
+                                            // Only send the response after transaction is successful
+                                            bleService.stopAdvertising() // Stop broadcasting
+                                            bleService.sendPaymentResponse(approved: true)
+                                            onPaymentAction(true)
+                                        } catch {
+                                            print("Error sending transaction: \(error)")
+                                            // Send declined response if transaction fails
+                                            bleService.stopAdvertising() // Stop broadcasting
+                                            bleService.sendPaymentResponse(approved: false)
+                                            onPaymentAction(false)
+                                        }
                                     }
                                 }
+                            }) {
+                                Text("Pay")
+                                    .foregroundColor(.white)
+                                    .padding(.vertical, 8)
+                                    .padding(.horizontal, 20)
+                                    .background(Color.blue)
+                                    .cornerRadius(8)
                             }
-                        }) {
-                            Text("Pay")
-                                .foregroundColor(.white)
-                                .padding(.vertical, 8)
-                                .padding(.horizontal, 20)
-                                .background(Color.blue)
-                                .cornerRadius(8)
                         }
+                        .padding(.top, 8)
                     }
-                    .padding(.top, 8)
                 }
             }
         }
