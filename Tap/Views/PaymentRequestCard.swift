@@ -89,9 +89,18 @@ struct PaymentRequestCard: View {
                                                 // Wait for animation to complete
                                                 try? await Task.sleep(nanoseconds: 800_000_000)
                                                 
-                                                // Notify payment complete
+                                                // Notify payment complete with transaction details
                                                 bleService.stopAdvertising()
-                                                bleService.sendPaymentResponse(approved: true)
+                                                bleService.sendPaymentResponse(
+                                                    approved: true,
+                                                    transactionDetails: [
+                                                        "hash": "0x" + UUID().uuidString.replacingOccurrences(of: "-", with: ""), // Replace with actual tx hash
+                                                        "amount": "\(amount)",
+                                                        "sender": privyService.walletAddress ?? "Unknown",
+                                                        "recipient": recipientAddress,
+                                                        "note": components.count >= 4 ? String(components[3]) : ""
+                                                    ]
+                                                )
                                                 onPaymentAction(true)
                                             } catch {
                                                 print("Error sending transaction: \(error)")

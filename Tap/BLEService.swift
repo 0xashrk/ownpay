@@ -109,9 +109,25 @@ class BLEService: NSObject, ObservableObject {
         startAdvertising()
     }
     
-    func sendPaymentResponse(approved: Bool) {
-        // Create and send payment response message
-        let message = "PAYMENT_RESPONSE:\(approved ? "APPROVED" : "DECLINED")"
+    func sendPaymentResponse(approved: Bool, transactionDetails: [String: String] = [:]) {
+        // Create a more detailed payment response message
+        var message = "PAYMENT_RESPONSE:\(approved ? "APPROVED" : "DECLINED")"
+        
+        // Add transaction details if available
+        if approved, 
+           let txHash = transactionDetails["hash"],
+           let amount = transactionDetails["amount"],
+           let sender = transactionDetails["sender"],
+           let recipient = transactionDetails["recipient"] {
+            // Format: PAYMENT_RESPONSE:APPROVED:HASH:AMOUNT:SENDER:RECIPIENT:NOTE
+            message += ":\(txHash):\(amount):\(sender):\(recipient)"
+            
+            // Add note if available
+            if let note = transactionDetails["note"] {
+                message += ":\(note)"
+            }
+        }
+        
         sendMessage(message)
         
         // Stop scanning immediately to prevent receiving more advertisements
