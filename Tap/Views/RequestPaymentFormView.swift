@@ -48,6 +48,72 @@ struct RequestPaymentFormView: View {
                 
                 Section(header: Text("Note (Optional)")) {
                     TextField("What's this for? (e.g., Coffee, Lunch)", text: $viewModel.note)
+                    
+                    VStack(spacing: 8) {
+                        Text("Quick Notes")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        HStack(spacing: 8) {
+                            Button(action: {
+                                viewModel.note = "Faucet"
+                            }) {
+                                Text("Faucet")
+                                    .font(.system(.body, design: .default))
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color.green.opacity(0.8))
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color.green, lineWidth: 1)
+                                    )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            Button(action: {
+                                viewModel.note = "Coffee"
+                            }) {
+                                Text("Coffee")
+                                    .font(.system(.body, design: .default))
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color.green.opacity(0.8))
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color.green, lineWidth: 1)
+                                    )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            Button(action: {
+                                viewModel.note = "Lunch"
+                            }) {
+                                Text("Lunch")
+                                    .font(.system(.body, design: .default))
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color.green.opacity(0.8))
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color.green, lineWidth: 1)
+                                    )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .padding(.top, 8)
                 }
             }
             .navigationTitle("Request Payment")
