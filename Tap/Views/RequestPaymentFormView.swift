@@ -1,5 +1,14 @@
 import SwiftUI
 
+// Extension to dismiss keyboard
+extension View {
+    func hideKeyboard() {
+        #if canImport(UIKit)
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        #endif
+    }
+}
+
 struct RequestPaymentFormView: View {
     @StateObject private var viewModel: RequestPaymentViewModel
     @Environment(\.dismiss) var dismiss
@@ -148,6 +157,10 @@ struct RequestPaymentFormView: View {
                     .padding(.bottom, 20)
                 }
                 .padding(.top, 20)
+            }
+            .contentShape(Rectangle()) // Make entire scroll view tappable
+            .onTapGesture {
+                hideKeyboard() // Dismiss keyboard when tapping anywhere
             }
             .navigationTitle("Request Payment")
             .navigationBarItems(
