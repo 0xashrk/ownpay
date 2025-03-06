@@ -4,6 +4,7 @@ import SwiftUI
 class SettingsViewModel: ObservableObject {
     @Published var isLoggingOut = false
     @Published var logoutError: String?
+    @AppStorage("isMerchantMode") var isMerchantMode = false
     
     private let privyService: PrivyService
     private let bleService: BLEService
@@ -31,5 +32,9 @@ class SettingsViewModel: ObservableObject {
         }
         
         isLoggingOut = false
+    }
+    
+    func toggleMerchantMode() {
+        isMerchantMode.toggle()
     }
 } 

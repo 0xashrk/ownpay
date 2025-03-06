@@ -10,11 +10,11 @@ struct WalletView: View {
         return service
     }()
     @StateObject private var privyService = PrivyService.shared
+    @StateObject private var settingsViewModel: SettingsViewModel
     @Binding var isLoggedIn: Bool
     @State private var showingRequestForm = false
     @State private var showingSendForm = false
     @State private var amount: String = "1" // Default to 1 MON
-    @State private var isMerchantMode = false
     @State private var showingPaymentSuccess = false
     @State private var isLoggingOut = false
     @State private var logoutError: String?
@@ -27,26 +27,22 @@ struct WalletView: View {
     private let paymentSuccessGenerator = UINotificationFeedbackGenerator()
     private let selectionGenerator = UISelectionFeedbackGenerator()
     
+    init(isLoggedIn: Binding<Bool>) {
+        _isLoggedIn = isLoggedIn
+        _settingsViewModel = StateObject(wrappedValue: SettingsViewModel(
+            privyService: PrivyService.shared,
+            bleService: BLEService()
+        ))
+    }
+    
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
                     // Wallet Address Section
-                    BalanceView(isMerchantMode: $isMerchantMode)
+                    BalanceView(isMerchantMode: $settingsViewModel.isMerchantMode)
                     
-                    // Mode Toggle with haptic
-                    Picker("Mode", selection: $isMerchantMode) {
-                        Text("Customer").tag(false)
-                        Text("Merchant").tag(true)
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                    .padding(.horizontal)
-                    .onChange(of: isMerchantMode) { _ in
-                        selectionGenerator.selectionChanged()
-                        processedRequests.removeAll() // Clear processed requests when mode changes
-                    }
-                    
-                    if isMerchantMode {
+                    if settingsViewModel.isMerchantMode {
                         // Merchant View
                         Button(action: {
                             selectionGenerator.selectionChanged()
@@ -126,7 +122,7 @@ struct WalletView: View {
                     }
                     
                     // Payment Requests (visible to customer)
-                    if !isMerchantMode, let message = bleService.receivedMessage, !hasProcessedRequest(message) {
+                    if !settingsViewModel.isMerchantMode, let message = bleService.receivedMessage, !hasProcessedRequest(message) {
                         PaymentRequestCard(message: message, bleService: bleService, onPaymentAction: { approved in
                             // Mark this request as processed
                             if let requestId = extractRequestId(from: message) {
@@ -170,7 +166,7 @@ struct WalletView: View {
                             
                             // Restart scanning after a short delay
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                if !isMerchantMode {
+                                if !settingsViewModel.isMerchantMode {
                                     bleService.startScanning()
                                 }
                             }
@@ -179,7 +175,7 @@ struct WalletView: View {
                     }
                     
                     // Payment Responses (visible to merchant)
-                    if isMerchantMode, let message = bleService.receivedMessage {
+                    if settingsViewModel.isMerchantMode, let message = bleService.receivedMessage {
                         if message.starts(with: "PAYMENT_RESPONSE:") {
                             PaymentResponseCard(message: message)
                                 .padding(.horizontal)
@@ -244,7 +240,7 @@ struct WalletView: View {
                     showingSendForm = false
                 }
             }
-            .onChange(of: isMerchantMode) { newValue in
+            .onChange(of: settingsViewModel.isMerchantMode) { newValue in
                 // Stop existing scanning timer
                 scanTimer?.invalidate()
                 scanTimer = nil
@@ -267,7 +263,7 @@ struct WalletView: View {
                 fetchBalanceWithRetry()
                 
                 // Start automatic scanning when in customer mode
-                if !isMerchantMode {
+                if !settingsViewModel.isMerchantMode {
                     setupAutoScan()
                 }
             }
@@ -294,7 +290,7 @@ struct WalletView: View {
         
         // Create a new timer that scans every 10 seconds
         scanTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { _ in
-            if !isMerchantMode && bleService.receivedMessage == nil {
+            if !settingsViewModel.isMerchantMode && bleService.receivedMessage == nil {
                 withAnimation {
                     isScanning = true
                 }

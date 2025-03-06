@@ -32,6 +32,17 @@ struct SettingsView: View {
                 }
             }
             
+            Section(header: Text("Wallet Mode")) {
+                Toggle(isOn: $viewModel.isMerchantMode) {
+                    HStack {
+                        Label(
+                            viewModel.isMerchantMode ? "Merchant Mode" : "Customer Mode",
+                            systemImage: viewModel.isMerchantMode ? "storefront" : "person"
+                        )
+                    }
+                }
+            }
+            
             Section {
                 Button(role: .destructive) {
                     Task {
