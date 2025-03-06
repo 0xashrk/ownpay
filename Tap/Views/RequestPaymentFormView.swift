@@ -10,15 +10,22 @@ struct RequestPaymentFormView: View {
     
     var body: some View {
         NavigationView {
-            Form {
-                Section(header: Text("Request Amount")) {
-                    TextField("Amount (MON)", text: $viewModel.amount)
-                        .keyboardType(.decimalPad)
-                    
-                    VStack(spacing: 8) {
+            ScrollView {
+                VStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Request Amount")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                        
+                        TextField("Amount (MON)", text: $viewModel.amount)
+                            .padding()
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(10)
+                        
                         Text("Quick Amounts")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
+                            .padding(.top, 4)
                         
                         HStack(spacing: 8) {
                             ForEach(viewModel.quickPaymentAmounts, id: \.self) { amount in
@@ -29,13 +36,13 @@ struct RequestPaymentFormView: View {
                                         .font(.system(.body, design: .monospaced))
                                         .foregroundColor(.white)
                                         .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 8)
+                                        .padding(.vertical, 12)
                                         .background(
-                                            RoundedRectangle(cornerRadius: 8)
+                                            RoundedRectangle(cornerRadius: 10)
                                                 .fill(Color.blue.opacity(0.8))
                                         )
                                         .overlay(
-                                            RoundedRectangle(cornerRadius: 8)
+                                            RoundedRectangle(cornerRadius: 10)
                                                 .stroke(Color.blue, lineWidth: 1)
                                         )
                                 }
@@ -43,16 +50,22 @@ struct RequestPaymentFormView: View {
                             }
                         }
                     }
-                    .padding(.top, 8)
-                }
-                
-                Section(header: Text("Note (Optional)")) {
-                    TextField("What's this for? (e.g., Coffee, Lunch)", text: $viewModel.note)
+                    .padding(.horizontal)
                     
-                    VStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Note (Optional)")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                        
+                        TextField("What's this for? (e.g., Coffee, Lunch)", text: $viewModel.note)
+                            .padding()
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(10)
+                        
                         Text("Quick Notes")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
+                            .padding(.top, 4)
                         
                         HStack(spacing: 8) {
                             Button(action: {
@@ -62,13 +75,13 @@ struct RequestPaymentFormView: View {
                                     .font(.system(.body, design: .default))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
+                                    .padding(.vertical, 12)
                                     .background(
-                                        RoundedRectangle(cornerRadius: 8)
+                                        RoundedRectangle(cornerRadius: 10)
                                             .fill(Color.green.opacity(0.8))
                                     )
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
+                                        RoundedRectangle(cornerRadius: 10)
                                             .stroke(Color.green, lineWidth: 1)
                                     )
                             }
@@ -81,13 +94,13 @@ struct RequestPaymentFormView: View {
                                     .font(.system(.body, design: .default))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
+                                    .padding(.vertical, 12)
                                     .background(
-                                        RoundedRectangle(cornerRadius: 8)
+                                        RoundedRectangle(cornerRadius: 10)
                                             .fill(Color.green.opacity(0.8))
                                     )
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
+                                        RoundedRectangle(cornerRadius: 10)
                                             .stroke(Color.green, lineWidth: 1)
                                     )
                             }
@@ -100,31 +113,47 @@ struct RequestPaymentFormView: View {
                                     .font(.system(.body, design: .default))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
+                                    .padding(.vertical, 12)
                                     .background(
-                                        RoundedRectangle(cornerRadius: 8)
+                                        RoundedRectangle(cornerRadius: 10)
                                             .fill(Color.green.opacity(0.8))
                                     )
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
+                                        RoundedRectangle(cornerRadius: 10)
                                             .stroke(Color.green, lineWidth: 1)
                                     )
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
                     }
-                    .padding(.top, 8)
+                    .padding(.horizontal)
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        viewModel.submitRequest()
+                    }) {
+                        Text("Request Payment")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(viewModel.isRequestEnabled ? Color.blue : Color.gray)
+                            )
+                            .padding(.horizontal)
+                    }
+                    .disabled(!viewModel.isRequestEnabled)
+                    .padding(.bottom, 20)
                 }
+                .padding(.top, 20)
             }
             .navigationTitle("Request Payment")
             .navigationBarItems(
                 leading: Button("Cancel") {
                     dismiss()
-                },
-                trailing: Button("Request") {
-                    viewModel.submitRequest()
                 }
-                .disabled(!viewModel.isRequestEnabled)
             )
         }
     }
