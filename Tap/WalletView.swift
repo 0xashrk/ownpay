@@ -400,30 +400,6 @@ struct PaymentRequestCard: View {
     }
 }
 
-struct PaymentResponseCard: View {
-    let message: String
-    
-    var body: some View {
-        VStack(spacing: 12) {
-            Text("Payment Response")
-                .font(.headline)
-            
-            let isApproved = message.contains("APPROVED")
-            Image(systemName: isApproved ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .font(.system(size: 40))
-                .foregroundColor(isApproved ? .green : .red)
-            
-            Text(isApproved ? "Payment Approved" : "Payment Declined")
-                .font(.title3)
-                .foregroundColor(isApproved ? .green : .red)
-        }
-        .padding()
-        .frame(maxWidth: .infinity)
-        .background(Color.gray.opacity(0.1))
-        .cornerRadius(10)
-    }
-}
-
 struct PaymentSuccessView: View {
     var body: some View {
         VStack {
