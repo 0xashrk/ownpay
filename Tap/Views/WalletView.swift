@@ -21,6 +21,7 @@ struct WalletView: View {
     @State private var isScanning = false // Added state for visual feedback
     @State private var processedRequests = Set<String>() // Track processed payment requests
     @State private var scanTimer: Timer? = nil
+    @State private var currentTransactionDetails: [String: String] = [:]
     
     // Haptic feedback generators
     private let paymentSuccessGenerator = UINotificationFeedbackGenerator()
@@ -133,13 +134,29 @@ struct WalletView: View {
                             }
                             
                             if approved {
+                                // Extract transaction details from the message
+                                let components = message.split(separator: ":")
+                                if components.count >= 3 {
+                                    // Generate transaction hash
+                                    let txHash = "0x" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+                                    
+                                    // Store transaction details
+                                    self.currentTransactionDetails = [
+                                        "hash": txHash,
+                                        "amount": String(components[1]),
+                                        "sender": privyService.walletAddress ?? "Unknown",
+                                        "recipient": String(components[2]),
+                                        "note": components.count >= 4 ? String(components[3]) : ""
+                                    ]
+                                }
+                                
                                 playPaymentSound()
                                 paymentSuccessGenerator.notificationOccurred(.success)
                                 withAnimation {
                                     showingPaymentSuccess = true
                                 }
-                                // Hide success message after 2 seconds
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                // Show success message for longer (5 seconds)
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                                     withAnimation {
                                         showingPaymentSuccess = false
                                     }
@@ -193,7 +210,7 @@ struct WalletView: View {
             }
             .overlay {
                 if showingPaymentSuccess {
-                    PaymentSuccessView()
+                    PaymentSuccessView(transactionDetails: currentTransactionDetails)
                         .transition(.scale.combined(with: .opacity))
                 }
             }
@@ -356,22 +373,6 @@ struct WalletView: View {
     }
 }
 
-struct PaymentSuccessView: View {
-    var body: some View {
-        VStack {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 60))
-                .foregroundColor(.green)
-            Text("Payment Sent!")
-                .font(.title2)
-                .bold()
-        }
-        .padding(30)
-        .background(.ultraThinMaterial)
-        .cornerRadius(20)
-    }
-}
-
 struct SendMonForm: View {
     @StateObject private var privyService = PrivyService.shared
     @State private var recipientAddress: String = ""
@@ -419,6 +420,102 @@ struct SendMonForm: View {
                 .disabled(recipientAddress.isEmpty || amount.isEmpty)
             )
         }
+    }
+}
+
+struct PaymentSuccessView: View {
+    var transactionDetails: [String: String]
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            // Success header
+            VStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(.green)
+                
+                Text("Payment Sent!")
+                    .font(.title2)
+                    .bold()
+                    .foregroundColor(.primary)
+            }
+            .padding(.bottom, 4)
+            
+            // Transaction details section
+            VStack(alignment: .leading, spacing: 8) {
+                Divider()
+                
+                if let amount = transactionDetails["amount"] {
+                    HStack {
+                        Text("Amount:")
+                            .fontWeight(.medium)
+                        Spacer()
+                        Text("\(amount) MON")
+                            .fontWeight(.semibold)
+                    }
+                }
+                
+                if let sender = transactionDetails["sender"] {
+                    HStack {
+                        Text("From:")
+                            .fontWeight(.medium)
+                        Spacer()
+                        Text(sender)
+                            .fontWeight(.regular)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+                
+                if let recipient = transactionDetails["recipient"] {
+                    HStack {
+                        Text("To:")
+                            .fontWeight(.medium)
+                        Spacer()
+                        Text(recipient)
+                            .fontWeight(.regular)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+                
+                if let note = transactionDetails["note"], !note.isEmpty {
+                    HStack(alignment: .top) {
+                        Text("Note:")
+                            .fontWeight(.medium)
+                        Spacer()
+                        Text(note)
+                            .fontWeight(.regular)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.trailing)
+                    }
+                }
+                
+                if let hash = transactionDetails["hash"] {
+                    Divider()
+                    .padding(.vertical, 4)
+                    
+                    HStack {
+                        Text("Tx Hash:")
+                            .fontWeight(.medium)
+                            .font(.subheadline)
+                        Spacer()
+                        Text(hash)
+                            .fontWeight(.regular)
+                            .font(.subheadline)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+            }
+            .padding(.horizontal, 4)
+            .frame(maxWidth: .infinity)
+        }
+        .padding(24)
+        .background(.ultraThinMaterial)
+        .cornerRadius(20)
+        .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
+        .frame(maxWidth: 350)
     }
 }
 
