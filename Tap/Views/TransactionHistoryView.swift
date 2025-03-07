@@ -6,6 +6,8 @@ struct TransactionHistoryView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var filterType: TransactionType?
+    @State private var selectedTransaction: PaymentTransaction?
+    @State private var showingTransactionDetail = false
     
     var filteredTransactions: [PaymentTransaction] {
         if let filterType = filterType {
@@ -53,6 +55,11 @@ struct TransactionHistoryView: View {
                 List {
                     ForEach(filteredTransactions) { transaction in
                         TransactionRow(transaction: transaction)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                selectedTransaction = transaction
+                                showingTransactionDetail = true
+                            }
                     }
                 }
             }
@@ -61,11 +68,18 @@ struct TransactionHistoryView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
-                    Button("All", action: { filterTransactions(by: nil) })
+                    Button("All", action: { filterTransactions(by: nil as TransactionType?) })
                     Button("Sent", action: { filterTransactions(by: .sent) })
                     Button("Received", action: { filterTransactions(by: .received) })
                 } label: {
                     Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
+                }
+            }
+        }
+        .sheet(isPresented: $showingTransactionDetail) {
+            if let transaction = selectedTransaction {
+                NavigationView {
+                    TransactionDetailView(transaction: transaction)
                 }
             }
         }
@@ -111,6 +125,97 @@ struct TransactionRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+struct TransactionDetailView: View {
+    let transaction: PaymentTransaction
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        List {
+            Section(header: Text("Transaction Details")) {
+                // Status row
+                HStack {
+                    Label(
+                        transaction.type == .sent ? "Sent" : "Received",
+                        systemImage: transaction.type == .sent ? "arrow.up.circle.fill" : "arrow.down.circle.fill"
+                    )
+                    .foregroundColor(transaction.type == .sent ? .red : .green)
+                    
+                    Spacer()
+                    
+                    Text(transaction.status.rawValue)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            transaction.status == .completed ? Color.green.opacity(0.2) :
+                            transaction.status == .pending ? Color.orange.opacity(0.2) :
+                            Color.red.opacity(0.2)
+                        )
+                        .cornerRadius(4)
+                }
+                
+                // Amount row
+                HStack {
+                    Text("Amount")
+                    Spacer()
+                    Text(transaction.formattedAmount)
+                        .foregroundColor(transaction.type == .sent ? .red : .green)
+                        .fontWeight(.bold)
+                }
+                
+                // Date row
+                HStack {
+                    Text("Date")
+                    Spacer()
+                    Text(transaction.timestamp, style: .date)
+                }
+                
+                // Time row
+                HStack {
+                    Text("Time")
+                    Spacer()
+                    Text(transaction.timestamp, style: .time)
+                }
+            }
+            
+            if let sender = transaction.sender {
+                Section(header: Text("From")) {
+                    Text(sender)
+                        .font(.subheadline)
+                }
+            }
+            
+            if let recipient = transaction.recipient {
+                Section(header: Text("To")) {
+                    Text(recipient)
+                        .font(.subheadline)
+                }
+            }
+            
+            if let note = transaction.note, !note.isEmpty {
+                Section(header: Text("Note")) {
+                    Text(note)
+                }
+            }
+            
+            if let hash = transaction.transactionHash {
+                Section(header: Text("Transaction Hash")) {
+                    Text(hash)
+                        .font(.system(.subheadline, design: .monospaced))
+                }
+            }
+        }
+        .navigationTitle("Transaction Details")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Done") {
+                    dismiss()
+                }
+            }
+        }
     }
 }
 
