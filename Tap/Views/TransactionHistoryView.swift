@@ -7,7 +7,6 @@ struct TransactionHistoryView: View {
     @State private var errorMessage: String?
     @State private var filterType: TransactionType?
     @State private var selectedTransaction: PaymentTransaction?
-    @State private var showingTransactionDetail = false
     
     var filteredTransactions: [PaymentTransaction] {
         if let filterType = filterType {
@@ -54,12 +53,11 @@ struct TransactionHistoryView: View {
             } else {
                 List {
                     ForEach(filteredTransactions) { transaction in
-                        TransactionRow(transaction: transaction)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                selectedTransaction = transaction
-                                showingTransactionDetail = true
-                            }
+                        NavigationLink {
+                            TransactionDetailView(transaction: transaction)
+                        } label: {
+                            TransactionRow(transaction: transaction)
+                        }
                     }
                 }
             }
@@ -73,13 +71,6 @@ struct TransactionHistoryView: View {
                     Button("Received", action: { filterTransactions(by: .received) })
                 } label: {
                     Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
-                }
-            }
-        }
-        .sheet(isPresented: $showingTransactionDetail) {
-            if let transaction = selectedTransaction {
-                NavigationView {
-                    TransactionDetailView(transaction: transaction)
                 }
             }
         }
@@ -209,13 +200,6 @@ struct TransactionDetailView: View {
         }
         .navigationTitle("Transaction Details")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Done") {
-                    dismiss()
-                }
-            }
-        }
     }
 }
 
