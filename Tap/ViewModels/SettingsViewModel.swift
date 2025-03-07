@@ -6,7 +6,7 @@ class SettingsViewModel: ObservableObject {
     @Published var logoutError: String?
     @AppStorage("isMerchantMode") var isMerchantMode = false
     
-    private let privyService: PrivyService
+    let privyService: PrivyService
     private let bleService: BLEService
     
     init(privyService: PrivyService, bleService: BLEService) {

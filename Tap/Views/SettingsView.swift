@@ -4,6 +4,7 @@ struct SettingsView: View {
     @StateObject private var viewModel: SettingsViewModel
     @Binding var isLoggedIn: Bool
     @Environment(\.dismiss) private var dismiss
+    @State private var addressCopied = false
     
     init(privyService: PrivyService, bleService: BLEService, isLoggedIn: Binding<Bool>) {
         _viewModel = StateObject(wrappedValue: SettingsViewModel(privyService: privyService, bleService: bleService))
@@ -12,23 +13,38 @@ struct SettingsView: View {
     
     var body: some View {
         List {
-            Section {
-                NavigationLink {
-                    AccountSettingsView()
-                } label: {
-                    Label("Account", systemImage: "person.circle")
+            Section(header: Text("Wallet")) {
+                Button(action: {
+                    copyWalletAddress()
+                }) {
+                    HStack {
+                        Spacer()
+                        HStack(spacing: 4) {
+                            Text(viewModel.privyService.walletAddress ?? "Not connected")
+                                .foregroundColor(.secondary)
+                                .font(.callout)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            
+                            if addressCopied {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                    .font(.caption)
+                            } else {
+                                Image(systemName: "doc.on.doc")
+                                    .foregroundColor(.blue)
+                                    .font(.caption)
+                            }
+                        }
+                    }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(PlainButtonStyle())
                 
                 NavigationLink {
                     TransactionHistoryView()
                 } label: {
                     Label("Transaction History", systemImage: "clock.arrow.circlepath")
-                }
-                
-                NavigationLink {
-                    NotificationSettingsView()
-                } label: {
-                    Label("Notifications", systemImage: "bell")
                 }
             }
             
@@ -74,26 +90,28 @@ struct SettingsView: View {
             }
         }
     }
-}
-
-struct AccountSettingsView: View {
-    var body: some View {
-        List {
-            Section {
-                NavigationLink {
-                    ProfileView()
-                } label: {
-                    Label("Profile", systemImage: "person.text.rectangle")
-                }
-                
-                NavigationLink {
-                    SecurityView()
-                } label: {
-                    Label("Security", systemImage: "lock.shield")
-                }
+    
+    private func copyWalletAddress() {
+        guard let address = viewModel.privyService.walletAddress else { return }
+        
+        #if os(iOS)
+        UIPasteboard.general.string = address
+        #elseif os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(address, forType: .string)
+        #endif
+        
+        // Show copied indicator
+        withAnimation {
+            addressCopied = true
+        }
+        
+        // Reset copied status after 2 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation {
+                addressCopied = false
             }
         }
-        .navigationTitle("Account")
     }
 }
 
@@ -122,20 +140,6 @@ struct NotificationSettingsView: View {
 }
 
 // Placeholder views for future implementation
-struct ProfileView: View {
-    var body: some View {
-        Text("Profile Settings")
-            .navigationTitle("Profile")
-    }
-}
-
-struct SecurityView: View {
-    var body: some View {
-        Text("Security Settings")
-            .navigationTitle("Security")
-    }
-}
-
 struct NetworkSettingsView: View {
     var body: some View {
         Text("Network Settings")
