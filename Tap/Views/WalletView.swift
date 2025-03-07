@@ -2,6 +2,7 @@ import SwiftUI
 import CoreBluetooth
 import AVFoundation
 import UIKit
+import SwiftData
 
 struct WalletView: View {
     @StateObject private var bleService: BLEService = {
@@ -11,6 +12,7 @@ struct WalletView: View {
     }()
     @StateObject private var privyService = PrivyService.shared
     @StateObject private var settingsViewModel: SettingsViewModel
+    @Environment(\.modelContext) private var modelContext
     @Binding var isLoggedIn: Bool
     @State private var showingRequestForm = false
     @State private var showingSendForm = false
@@ -144,6 +146,20 @@ struct WalletView: View {
                                         "recipient": String(components[2]),
                                         "note": components.count >= 4 ? String(components[3]) : ""
                                     ]
+                                    
+                                    // Save the transaction to SwiftData for the customer
+                                    let customerTransaction = PaymentTransaction(
+                                        isApproved: true,
+                                        transactionHash: txHash,
+                                        amount: String(components[1]),
+                                        sender: privyService.walletAddress ?? "Unknown",
+                                        recipient: String(components[2]),
+                                        note: components.count >= 4 ? String(components[3]) : "",
+                                        type: .sent,  // Important! This is a SENT transaction for the customer
+                                        status: .completed
+                                    )
+                                    modelContext.insert(customerTransaction)
+                                    try? modelContext.save()
                                 }
                                 
                                 playPaymentSound()
@@ -365,56 +381,6 @@ struct WalletView: View {
                     }
                 }
             }
-        }
-    }
-}
-
-struct SendMonForm: View {
-    @StateObject private var privyService = PrivyService.shared
-    @State private var recipientAddress: String = ""
-    @State private var amount: String = ""
-    let onSend: (String, Double) -> Void
-    @Environment(\.dismiss) var dismiss
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Recipient Address")) {
-                    TextField("Enter wallet address", text: $recipientAddress)
-                        .autocapitalization(.none)
-                        .disableAutocorrection(true)
-                        .onAppear {
-                            recipientAddress = privyService.defaultRecipientAddress
-                        }
-                }
-                
-                Section(header: Text("Amount")) {
-                    TextField("Amount (MON)", text: $amount)
-                        .keyboardType(.decimalPad)
-                        .onAppear {
-                            amount = String(format: "%.2f", privyService.defaultAmount)
-                        }
-                }
-            }
-            .navigationTitle("Send MON")
-            .navigationBarItems(
-                leading: Button("Cancel") {
-                    dismiss()
-                },
-                trailing: Button("Send") {
-                    if let amountDouble = Double(amount) {
-                        Task {
-                            do {
-                                try await privyService.sendTransaction(amount: amountDouble, to: recipientAddress)
-                            } catch {
-                                print("Error sending transaction: \(error)")
-                            }
-                        }
-                        dismiss()
-                    }
-                }
-                .disabled(recipientAddress.isEmpty || amount.isEmpty)
-            )
         }
     }
 }
