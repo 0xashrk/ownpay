@@ -292,12 +292,12 @@ extension BLEService: CBCentralManagerDelegate {
         let shouldTriggerHaptic = (nowTime - lastHapticTime) > hapticThrottleInterval
         
         if smoothedRSSI < rssiThresholdForHaptic {
-            print("Too far for haptic feedback: \(smoothedRSSI) < \(rssiThresholdForHaptic)")
+//            print("Too far for haptic feedback: \(smoothedRSSI) < \(rssiThresholdForHaptic)")
             DispatchQueue.main.async {
                 self.isInRange = false
             }
         } else {
-            print("In range for haptic: \(smoothedRSSI) >= \(rssiThresholdForHaptic)")
+//            print("In range for haptic: \(smoothedRSSI) >= \(rssiThresholdForHaptic)")
             if !isInRange && shouldTriggerHaptic {
                 DispatchQueue.main.async {
                     self.isInRange = true
@@ -312,7 +312,7 @@ extension BLEService: CBCentralManagerDelegate {
         if smoothedRSSI >= rssiThresholdForConnection && 
            consecutiveValidReadings >= requiredConsistentReadings && 
            connectionState == .disconnected {
-            print("✅ Device in range with consistent readings, connecting... Smoothed RSSI: \(smoothedRSSI)")
+//            print("✅ Device in range with consistent readings, connecting... Smoothed RSSI: \(smoothedRSSI)")
             connect(peripheral: peripheral)
             DispatchQueue.main.async {
                 self.hapticEngine.impactOccurred(intensity: 1.0)
