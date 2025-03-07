@@ -1,7 +1,9 @@
 import SwiftUI
+import SwiftData
 
 struct PaymentResponseCard: View {
     @StateObject private var viewModel: PaymentResponseViewModel
+    @Environment(\.modelContext) private var modelContext
     
     init(message: String) {
         _viewModel = StateObject(wrappedValue: PaymentResponseViewModel(message: message))
@@ -101,8 +103,13 @@ struct PaymentResponseCard: View {
                 in: RoundedRectangle(cornerRadius: 16)
             )
             .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
-            // This ensures proper vertical centering
             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+            .onAppear {
+                // Save the transaction to SwiftData when the card appears
+                let transaction = PaymentTransaction.fromResponseMessage(viewModel.message)
+                modelContext.insert(transaction)
+                try? modelContext.save()
+            }
         }
     }
 }

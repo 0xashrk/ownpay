@@ -1,9 +1,18 @@
 import SwiftUI
+import SwiftData
 
 struct TransactionHistoryView: View {
-    @State private var transactions: [WalletTransaction] = WalletTransaction.sampleData
+    @Query(sort: \PaymentTransaction.timestamp, order: .reverse) private var transactions: [PaymentTransaction]
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var filterType: TransactionType?
+    
+    var filteredTransactions: [PaymentTransaction] {
+        if let filterType = filterType {
+            return transactions.filter { $0.type == filterType }
+        }
+        return transactions
+    }
     
     var body: some View {
         VStack {
@@ -18,7 +27,8 @@ struct TransactionHistoryView: View {
                     Text(errorMessage)
                         .foregroundColor(.secondary)
                     Button("Try Again") {
-                        loadTransactions()
+                        self.errorMessage = nil
+                        self.isLoading = false
                     }
                     .padding()
                     .background(Color.blue)
@@ -27,7 +37,7 @@ struct TransactionHistoryView: View {
                     .padding(.top)
                 }
                 .padding()
-            } else if transactions.isEmpty {
+            } else if filteredTransactions.isEmpty {
                 VStack(spacing: 16) {
                     Image(systemName: "tray")
                         .font(.system(size: 60))
@@ -41,7 +51,7 @@ struct TransactionHistoryView: View {
                 .padding()
             } else {
                 List {
-                    ForEach(transactions) { transaction in
+                    ForEach(filteredTransactions) { transaction in
                         TransactionRow(transaction: transaction)
                     }
                 }
@@ -59,34 +69,15 @@ struct TransactionHistoryView: View {
                 }
             }
         }
-        .onAppear {
-            loadTransactions()
-        }
-    }
-    
-    private func loadTransactions() {
-        isLoading = true
-        errorMessage = nil
-        
-        // Simulate network request
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            // In a real app, you would fetch transactions from a service
-            transactions = WalletTransaction.sampleData
-            isLoading = false
-        }
     }
     
     private func filterTransactions(by type: TransactionType?) {
-        if let type = type {
-            transactions = WalletTransaction.sampleData.filter { $0.type == type }
-        } else {
-            transactions = WalletTransaction.sampleData
-        }
+        filterType = type
     }
 }
 
 struct TransactionRow: View {
-    let transaction: WalletTransaction
+    let transaction: PaymentTransaction
     
     var body: some View {
         HStack {
@@ -97,7 +88,7 @@ struct TransactionRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(transaction.title)
                     .font(.headline)
-                Text(transaction.date, style: .date)
+                Text(transaction.timestamp, style: .date)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -121,71 +112,6 @@ struct TransactionRow: View {
         }
         .padding(.vertical, 4)
     }
-}
-
-struct WalletTransaction: Identifiable {
-    let id = UUID()
-    let title: String
-    let amount: Double
-    let date: Date
-    let type: TransactionType
-    let status: TransactionStatus
-    
-    var formattedAmount: String {
-        let prefix = type == .sent ? "-" : "+"
-        return "\(prefix)$\(String(format: "%.2f", amount))"
-    }
-    
-    static var sampleData: [WalletTransaction] {
-        [
-            WalletTransaction(
-                title: "Payment to John",
-                amount: 50.0,
-                date: Date().addingTimeInterval(-86400),
-                type: .sent,
-                status: .completed
-            ),
-            WalletTransaction(
-                title: "Received from Sarah",
-                amount: 25.0,
-                date: Date().addingTimeInterval(-172800),
-                type: .received,
-                status: .completed
-            ),
-            WalletTransaction(
-                title: "Gas fee refund",
-                amount: 0.01,
-                date: Date().addingTimeInterval(-259200),
-                type: .received,
-                status: .completed
-            ),
-            WalletTransaction(
-                title: "NFT Purchase",
-                amount: 0.5,
-                date: Date().addingTimeInterval(-432000),
-                type: .sent,
-                status: .pending
-            ),
-            WalletTransaction(
-                title: "Swap ETH to USDC",
-                amount: 100.0,
-                date: Date().addingTimeInterval(-518400),
-                type: .sent,
-                status: .failed
-            )
-        ]
-    }
-}
-
-enum TransactionType {
-    case sent
-    case received
-}
-
-enum TransactionStatus: String {
-    case completed = "Completed"
-    case pending = "Pending"
-    case failed = "Failed"
 }
 
 #Preview {

@@ -6,11 +6,23 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct TapApp: App {
     @StateObject private var privyService = PrivyService.shared
     @State private var isLoggedIn = false
+    
+    // Create a ModelContainer for the PaymentTransaction model
+    let modelContainer: ModelContainer
+    
+    init() {
+        do {
+            modelContainer = try ModelContainer(for: PaymentTransaction.self)
+        } catch {
+            fatalError("Failed to create ModelContainer for PaymentTransaction: \(error.localizedDescription)")
+        }
+    }
     
     var body: some Scene {
         WindowGroup {
@@ -29,5 +41,6 @@ struct TapApp: App {
                     }
             }
         }
+        .modelContainer(modelContainer)
     }
 }
