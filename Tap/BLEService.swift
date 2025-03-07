@@ -284,8 +284,8 @@ extension BLEService: CBCentralManagerDelegate {
         
         lastValidRSSI = smoothedRSSI
         
-        print("Raw RSSI: \(rawRSSIValue) dBm, Smoothed RSSI: \(smoothedRSSI) dBm, Consistent Readings: \(consecutiveValidReadings)")
-        print("Connection threshold: \(rssiThresholdForConnection) dBm")
+//        print("Raw RSSI: \(rawRSSIValue) dBm, Smoothed RSSI: \(smoothedRSSI) dBm, Consistent Readings: \(consecutiveValidReadings)")
+//        print("Connection threshold: \(rssiThresholdForConnection) dBm")
         
         // Update isInRange and provide haptic feedback when getting close
         let nowTime = Date().timeIntervalSince1970
@@ -319,24 +319,24 @@ extension BLEService: CBCentralManagerDelegate {
             }
         } else {
             if connectionState != .disconnected {
-                print("❌ Not connecting: Already in state: \(connectionState)")
+//                print("❌ Not connecting: Already in state: \(connectionState)")
             } else if consecutiveValidReadings < requiredConsistentReadings {
-                print("❌ Not connecting: Need more consistent readings (\(consecutiveValidReadings)/\(requiredConsistentReadings))")
+//                print("❌ Not connecting: Need more consistent readings (\(consecutiveValidReadings)/\(requiredConsistentReadings))")
             } else {
-                print("❌ Not connecting: Smoothed RSSI \(smoothedRSSI) < threshold \(rssiThresholdForConnection)")
+//                print("❌ Not connecting: Smoothed RSSI \(smoothedRSSI) < threshold \(rssiThresholdForConnection)")
             }
         }
     }
     
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        print("Connected to Tap device")
+//        print("Connected to Tap device")
         connectionState = .connected
         peripheral.delegate = self
         peripheral.discoverServices([serviceUUID])
     }
     
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
-        print("Disconnected from Tap device")
+//        print("Disconnected from Tap device")
         connectionState = .disconnected
         connectedPeripheral = nil
         characteristic = nil
