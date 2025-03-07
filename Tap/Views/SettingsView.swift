@@ -20,9 +20,9 @@ struct SettingsView: View {
                 }
                 
                 NavigationLink {
-                    WalletSettingsView()
+                    TransactionHistoryView()
                 } label: {
-                    Label("Wallet", systemImage: "wallet.pass")
+                    Label("Transaction History", systemImage: "clock.arrow.circlepath")
                 }
                 
                 NavigationLink {
@@ -94,27 +94,6 @@ struct AccountSettingsView: View {
             }
         }
         .navigationTitle("Account")
-    }
-}
-
-struct WalletSettingsView: View {
-    var body: some View {
-        List {
-            Section {
-                NavigationLink {
-                    NetworkSettingsView()
-                } label: {
-                    Label("Network", systemImage: "network")
-                }
-                
-                NavigationLink {
-                    TransactionHistoryView()
-                } label: {
-                    Label("Transaction History", systemImage: "clock.arrow.circlepath")
-                }
-            }
-        }
-        .navigationTitle("Wallet")
     }
 }
 
