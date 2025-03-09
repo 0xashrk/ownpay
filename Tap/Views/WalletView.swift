@@ -45,24 +45,7 @@ struct WalletView: View {
                     BalanceView(isMerchantMode: $settingsViewModel.isMerchantMode)
                     
                     if settingsViewModel.isMerchantMode {
-                        // Merchant View
-                        Button(action: {
-                            selectionGenerator.selectionChanged()
-                            showingRequestForm = true
-                        }) {
-                            HStack {
-                                Image(systemName: "dollarsign.circle.fill")
-                                    .font(.system(size: 24))
-                                Text("Request Payment")
-                                    .font(.headline)
-                            }
-                            .foregroundColor(.blue)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue.opacity(0.1))
-                            .cornerRadius(15)
-                        }
-                        .padding(.horizontal)
+                        MerchantView(showingRequestForm: $showingRequestForm, selectionGenerator: selectionGenerator)
                     } else {
                         // Customer View - shows status and send button
                         VStack(spacing: 16) {
@@ -126,8 +109,11 @@ struct WalletView: View {
                     // Payment Requests (visible to customer)
                     if !settingsViewModel.isMerchantMode, let message = bleService.receivedMessage, !hasProcessedRequest(message) {
                         PaymentRequestCard(message: message, bleService: bleService, onPaymentAction: { approved in
-                            // Mark this request as processed
+                            // Process the payment request only once
+                            // Mark this request as processed immediately
                             if let requestId = extractRequestId(from: message) {
+                                // Check if we've already processed this specific request
+                                guard !processedRequests.contains(requestId) else { return }
                                 processedRequests.insert(requestId)
                             }
                             
@@ -382,6 +368,32 @@ struct WalletView: View {
                 }
             }
         }
+    }
+}
+
+// Add this new view outside the WalletView struct
+struct MerchantView: View {
+    @Binding var showingRequestForm: Bool
+    let selectionGenerator: UISelectionFeedbackGenerator
+    
+    var body: some View {
+        Button(action: {
+            selectionGenerator.selectionChanged()
+            showingRequestForm = true
+        }) {
+            HStack {
+                Image(systemName: "dollarsign.circle.fill")
+                    .font(.system(size: 24))
+                Text("Request Payment")
+                    .font(.headline)
+            }
+            .foregroundColor(.blue)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color.blue.opacity(0.1))
+            .cornerRadius(15)
+        }
+        .padding(.horizontal)
     }
 }
 
