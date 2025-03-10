@@ -20,10 +20,21 @@ struct BalanceView: View {
     private let cyberpunkDark = Color(hex: "000000")
     private let cyberpunkGlow = Color(hex: "00FFFF").opacity(0.3)
     
+    // Faucet Colors - completely different from purple
+    private let faucetBlue = Color(hex: "00C2FF")
+    private let faucetDarkBlue = Color(hex: "042D4B")
+    
     var body: some View {
         Group {
             if isMerchantMode {
                 MerchantBalanceView(
+                    privyService: privyService,
+                    isRefreshing: $isRefreshing,
+                    showingAccountSheet: $showingAccountSheet,
+                    showCopiedToast: $showCopiedToast
+                )
+            } else if SettingsViewModel.shared.selectedMode == .faucet {
+                FaucetBalanceView(
                     privyService: privyService,
                     isRefreshing: $isRefreshing,
                     showingAccountSheet: $showingAccountSheet,
@@ -294,18 +305,19 @@ struct AccountDetailsSheet: View {
     let isMerchant: Bool
     
     private let cyberpunkCyan = Color(hex: "00FFFF")
+    private let soloBlue = Color(hex: "00C2FF") // Use Solo blue for faucet mode
     
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
                 // Account Icon
                 Circle()
-                    .fill(isMerchant ? cyberpunkCyan.opacity(0.1) : Color(hex: "836EF9").opacity(0.1))
+                    .fill(getAccountColor().opacity(0.1))
                     .frame(width: 80, height: 80)
                     .overlay(
-                        Image(systemName: "person.crop.circle.fill")
+                        Image(systemName: getAccountIcon())
                             .font(.system(size: 40))
-                            .foregroundStyle(isMerchant ? cyberpunkCyan : Color(hex: "836EF9"))
+                            .foregroundStyle(getAccountColor())
                     )
                 
                 // Account Details
@@ -332,7 +344,7 @@ struct AccountDetailsSheet: View {
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
-                        .background(isMerchant ? cyberpunkCyan.opacity(0.1) : Color(hex: "836EF9").opacity(0.1))
+                        .background(getAccountColor().opacity(0.1))
                         .cornerRadius(8)
                     }
                     .buttonStyle(.plain)
@@ -352,6 +364,24 @@ struct AccountDetailsSheet: View {
             }
         }
     }
+    
+    private func getAccountColor() -> Color {
+        if isMerchant {
+            return cyberpunkCyan
+        } else if SettingsViewModel.shared.selectedMode == .faucet {
+            return soloBlue // Use blue for faucet mode
+        } else {
+            return Color(hex: "836EF9") // Purple for customer mode
+        }
+    }
+    
+    private func getAccountIcon() -> String {
+        if SettingsViewModel.shared.selectedMode == .faucet {
+            return "drop.fill"
+        } else {
+            return "person.crop.circle.fill"
+        }
+    }
 }
 
 struct ToastView: View {
@@ -359,6 +389,7 @@ struct ToastView: View {
     let isMerchant: Bool
     
     private let cyberpunkCyan = Color(hex: "00FFFF")
+    private let soloBlue = Color(hex: "00C2FF") // Use Solo blue for faucet
     
     var body: some View {
         Text(message)
@@ -366,10 +397,120 @@ struct ToastView: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(isMerchant ? cyberpunkCyan : Color(hex: "836EF9"))
+            .background(getToastColor())
             .clipShape(Capsule())
             .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
             .padding(.top, 8)
+    }
+    
+    private func getToastColor() -> Color {
+        if isMerchant {
+            return cyberpunkCyan
+        } else if SettingsViewModel.shared.selectedMode == .faucet {
+            return soloBlue // Use blue for faucet mode
+        } else {
+            return Color(hex: "836EF9") // Purple for customer mode
+        }
+    }
+}
+
+struct FaucetBalanceView: View {
+    @ObservedObject var privyService: PrivyService
+    @Binding var isRefreshing: Bool
+    @Binding var showingAccountSheet: Bool
+    @Binding var showCopiedToast: Bool
+    
+    // Solo Leveling inspired colors - simpler palette
+    private let soloBlue = Color(hex: "00C2FF")
+    private let soloDark = Color.black
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Card with simplified design
+            VStack(spacing: 32) {
+                // Top section with logo and account button
+                HStack(spacing: 0) {
+                    Image("monad-logo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 12)
+                    Spacer()
+                    if privyService.walletAddress != nil {
+                        Button {
+                            showingAccountSheet = true
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(soloBlue.opacity(0.8))
+                                .frame(width: 32, height: 32)
+                                .contentShape(Rectangle())
+                        }
+                        .padding(.trailing, -8)
+                    }
+                }
+                
+                if privyService.walletAddress != nil {
+                    // Balance section
+                    VStack(alignment: .leading, spacing: 12) {
+                        if let balance = privyService.balance {
+                            Text("Faucet Balance")
+                                .font(.subheadline)
+                                .foregroundStyle(soloBlue.opacity(0.7))
+                            Text(balance)
+                                .font(.system(size: 44, weight: .semibold))
+                                .foregroundStyle(soloBlue)
+                        } else {
+                            Text("Fetching balance...")
+                                .font(.body)
+                                .foregroundStyle(soloBlue.opacity(0.7))
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 16)
+                } else {
+                    Text("Connecting wallet...")
+                        .font(.body)
+                        .foregroundStyle(soloBlue.opacity(0.7))
+                }
+                
+                if isRefreshing {
+                    ProgressView()
+                        .tint(soloBlue)
+                }
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity)
+            .frame(height: 200)
+            .background(
+                ZStack {
+                    // Base gradient
+                    LinearGradient(
+                        colors: [
+                            soloDark,
+                            soloDark.opacity(0.8)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    
+                    // Subtle inner gradient
+                    LinearGradient(
+                        colors: [
+                            soloBlue.opacity(0.05),
+                            .clear
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                }
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(soloBlue.opacity(0.2), lineWidth: 1)
+            )
+        }
+        .padding(.horizontal)
     }
 }
 

@@ -428,7 +428,6 @@ struct FaucetView: View {
     var body: some View {
         // Customer View - shows status and send button
         VStack(spacing: 16) {
-            Text("F mode")
             HStack {
                 Text(isScanning ? "Scanning..." : "Scanning for payment requests...")
                     .foregroundColor(.secondary)
