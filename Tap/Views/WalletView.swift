@@ -24,6 +24,7 @@ struct WalletView: View {
     @State private var processedRequests = Set<String>() // Track processed payment requests
     @State private var scanTimer: Timer? = nil
     @State private var currentTransactionDetails: [String: String] = [:]
+    @StateObject private var paymentViewModel = PaymentViewModel()
     
     // Haptic feedback generators
     private let paymentSuccessGenerator = UINotificationFeedbackGenerator()
@@ -60,125 +61,39 @@ struct WalletView: View {
                     }
                     
                     // Payment Requests (visible to customer or faucet)
-                    if settingsViewModel.selectedMode != .merchant, let message = bleService.receivedMessage, !hasProcessedRequest(message) {
+                    if settingsViewModel.selectedMode != .merchant, 
+                       let message = bleService.receivedMessage, 
+                       !paymentViewModel.hasProcessedRequest(message) {
+                        
                         PaymentRequestCard(message: message, bleService: bleService, onPaymentAction: { approved in
-                            // Process the payment request only once
-                            // Mark this request as processed immediately
-                            if let requestId = extractRequestId(from: message) {
-                                // Check if we've already processed this specific request
-                                guard !processedRequests.contains(requestId) else { return }
-                                processedRequests.insert(requestId)
-                            }
-                            
-                            // For faucet mode: check previous payments in SwiftData
-                            if settingsViewModel.selectedMode == .faucet {
-                                let components = message.split(separator: ":")
-                                if components.count >= 3 {
-                                    let recipient = String(components[2])
-                                    
-                                    // Create a descriptor to query SwiftData
-                                    let descriptor = FetchDescriptor<PaymentTransaction>(
-                                        predicate: #Predicate<PaymentTransaction> { 
-                                            $0.recipient == recipient && $0.isApproved == true
-                                        }
-                                    )
-                                    
-                                    do {
-                                        // Query SwiftData for previous payments
-                                        let previousPayments = try modelContext.fetch(descriptor)
-                                        let count = previousPayments.count
-                                        
-                                        // Log the count to console
-                                        print("🚰 FAUCET MODE: Recipient \(recipient) has received \(count) previous payments")
-                                        
-                                        // Could add UI warning here in the future if count > 0
-                                    } catch {
-                                        print("Error fetching previous payments: \(error)")
-                                    }
-                                }
-                            }
-                            
-                            if approved {
-                                // Extract transaction details from the message
-                                let components = message.split(separator: ":")
-                                if components.count >= 3 {
-                                    // Generate transaction hash
-                                    let txHash = "0x" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
-                                    
-                                    // Store transaction details
-                                    self.currentTransactionDetails = [
-                                        "hash": txHash,
-                                        "amount": String(components[1]),
-                                        "sender": privyService.walletAddress ?? "Unknown",
-                                        "recipient": String(components[2]),
-                                        "note": components.count >= 4 ? String(components[3]) : ""
-                                    ]
-                                    
-                                    // Save the transaction to SwiftData for the customer
-                                    let customerTransaction = PaymentTransaction(
-                                        isApproved: true,
-                                        transactionHash: txHash,
-                                        amount: String(components[1]),
-                                        sender: privyService.walletAddress ?? "Unknown",
-                                        recipient: String(components[2]),
-                                        note: components.count >= 4 ? String(components[3]) : "",
-                                        type: .sent,  // Important! This is a SENT transaction for the customer
-                                        status: .completed
-                                    )
-                                    modelContext.insert(customerTransaction)
-                                    try? modelContext.save()
-                                }
-                                
-                                playPaymentSound()
-                                paymentSuccessGenerator.notificationOccurred(.success)
-                                withAnimation {
-                                    showingPaymentSuccess = true
-                                }
-                                // Show success message for longer (5 seconds)
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                                    withAnimation {
-                                        showingPaymentSuccess = false
-                                    }
-                                }
-                            } else {
-                                paymentSuccessGenerator.notificationOccurred(.error)
-                            }
-                            
-                            // Clear message and restart scanning after processing
-                            bleService.receivedMessage = nil
-                            
-                            // Restart scanning after a short delay
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                if settingsViewModel.selectedMode != .merchant {
-                                    bleService.startScanning()
-                                }
-                            }
+                            _ = paymentViewModel.processPaymentRequest(
+                                message: message,
+                                approved: approved,
+                                modelContext: modelContext,
+                                privyService: privyService,
+                                bleService: bleService,
+                                settingsViewModel: settingsViewModel,
+                                playSound: playPaymentSound
+                            )
                         })
                         .padding(.horizontal)
                     }
                     
                     // Payment Responses (visible to merchant)
-                    if settingsViewModel.selectedMode == .merchant, let message = bleService.receivedMessage {
-                        if message.starts(with: "PAYMENT_RESPONSE:") {
-                            PaymentResponseCard(message: message)
-                                .padding(.horizontal)
-                                .onAppear {
-                                    if message.contains("APPROVED") {
-                                        playPaymentSound()
-                                        paymentSuccessGenerator.notificationOccurred(.success)
-                                        
-                                        // Try to fetch balance with retries
-                                        fetchBalanceWithRetry()
-                                    } else {
-                                        paymentSuccessGenerator.notificationOccurred(.error)
-                                    }
-                                    
-                                    // Clear payment response after displaying
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                                        bleService.receivedMessage = nil
-                                    }
-                                }
-                        }
+                    if settingsViewModel.selectedMode == .merchant, 
+                       let message = bleService.receivedMessage,
+                       message.starts(with: "PAYMENT_RESPONSE:") {
+                        
+                        PaymentResponseCard(message: message)
+                            .padding(.horizontal)
+                            .onAppear {
+                                paymentViewModel.processPaymentResponse(
+                                    message: message,
+                                    bleService: bleService,
+                                    fetchBalance: { fetchBalanceWithRetry() },
+                                    playSound: playPaymentSound
+                                )
+                            }
                     }
                 }
                 .padding()
@@ -188,8 +103,8 @@ struct WalletView: View {
                 await privyService.fetchBalance()
             }
             .overlay {
-                if showingPaymentSuccess {
-                    PaymentSuccessView(transactionDetails: currentTransactionDetails)
+                if paymentViewModel.showingPaymentSuccess {
+                    PaymentSuccessView(transactionDetails: paymentViewModel.currentTransactionDetails)
                         .transition(.scale.combined(with: .opacity))
                 }
             }
@@ -291,33 +206,6 @@ struct WalletView: View {
                 }
             }
         }
-    }
-    
-    // Extract a unique ID from a payment request message
-    private func extractRequestId(from message: String) -> String? {
-        if message.starts(with: "PAYMENT_REQUEST:") {
-            let components = message.split(separator: ":")
-            
-            // If the message includes a request ID (5 components)
-            if components.count >= 5 {
-                // Use the actual unique ID from the message
-                return String(components[4])
-            }
-            // Fallback for backward compatibility with older message format
-            else if components.count >= 3 {
-                // Legacy method: Create ID from amount and address
-                return "\(components[1]):\(components[2])"
-            }
-        }
-        return nil
-    }
-    
-    // Check if a payment request has already been processed
-    private func hasProcessedRequest(_ message: String) -> Bool {
-        guard let requestId = extractRequestId(from: message) else {
-            return false
-        }
-        return processedRequests.contains(requestId)
     }
     
     private func playPaymentSound() {
