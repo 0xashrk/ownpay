@@ -70,6 +70,34 @@ struct WalletView: View {
                                 processedRequests.insert(requestId)
                             }
                             
+                            // For faucet mode: check previous payments in SwiftData
+                            if settingsViewModel.selectedMode == .faucet {
+                                let components = message.split(separator: ":")
+                                if components.count >= 3 {
+                                    let recipient = String(components[2])
+                                    
+                                    // Create a descriptor to query SwiftData
+                                    let descriptor = FetchDescriptor<PaymentTransaction>(
+                                        predicate: #Predicate<PaymentTransaction> { 
+                                            $0.recipient == recipient && $0.isApproved == true
+                                        }
+                                    )
+                                    
+                                    do {
+                                        // Query SwiftData for previous payments
+                                        let previousPayments = try modelContext.fetch(descriptor)
+                                        let count = previousPayments.count
+                                        
+                                        // Log the count to console
+                                        print("🚰 FAUCET MODE: Recipient \(recipient) has received \(count) previous payments")
+                                        
+                                        // Could add UI warning here in the future if count > 0
+                                    } catch {
+                                        print("Error fetching previous payments: \(error)")
+                                    }
+                                }
+                            }
+                            
                             if approved {
                                 // Extract transaction details from the message
                                 let components = message.split(separator: ":")
