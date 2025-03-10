@@ -269,8 +269,15 @@ struct WalletView: View {
     private func extractRequestId(from message: String) -> String? {
         if message.starts(with: "PAYMENT_REQUEST:") {
             let components = message.split(separator: ":")
-            if components.count >= 3 {
-                // Create a unique ID from amount and address
+            
+            // If the message includes a request ID (5 components)
+            if components.count >= 5 {
+                // Use the actual unique ID from the message
+                return String(components[4])
+            }
+            // Fallback for backward compatibility with older message format
+            else if components.count >= 3 {
+                // Legacy method: Create ID from amount and address
                 return "\(components[1]):\(components[2])"
             }
         }

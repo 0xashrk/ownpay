@@ -101,8 +101,11 @@ class BLEService: NSObject, ObservableObject {
         connectionState = .disconnected
         isInRange = false
         
-        // Create payment request message
-        let message = "PAYMENT_REQUEST:\(amount):\(walletAddress):\(note)"
+        // Generate a unique request ID (UUID)
+        let requestId = UUID().uuidString
+        
+        // Create payment request message with unique ID
+        let message = "PAYMENT_REQUEST:\(amount):\(walletAddress):\(note):\(requestId)"
         pendingPaymentRequest = message
         
         // Start fresh advertising
