@@ -13,6 +13,7 @@ struct PaymentRequestCard: View {
     @StateObject private var privyService = PrivyService.shared
     @State private var paymentState: PaymentState = .initial
     @State private var rotationDegrees = 0.0
+    @State private var timeRemainingForCooldown: TimeInterval?
     
     enum PaymentState {
         case initial
@@ -54,18 +55,43 @@ struct PaymentRequestCard: View {
                         
                         // Calculate total amount already sent
                         var totalSent = 0.0
+                        var mostRecentDate: Date? = nil
+                        
                         for payment in matchingPayments {
                             if let amountString = payment.amount, 
                                let amount = Double(amountString) {
                                 totalSent += amount
+                                
+                                // Track the most recent transaction date
+                                if mostRecentDate == nil || (payment.timestamp != nil && payment.timestamp > mostRecentDate!) {
+                                    mostRecentDate = payment.timestamp
+                                }
                             }
                         }
                         
                         // Check if exceeds limit
                         exceedsFaucetLimit = (totalSent + requestedAmount > 0.05)
                         
+                        // Calculate time remaining for cooldown (12 hours from last transaction)
+                        if let lastDate = mostRecentDate {
+                            let cooldownPeriod: TimeInterval = 12 * 60 * 60 // 12 hours in seconds
+                            let now = Date()
+                            let elapsedTime = now.timeIntervalSince(lastDate)
+                            
+                            if elapsedTime < cooldownPeriod {
+                                // Still in cooldown period
+                                timeRemainingForCooldown = cooldownPeriod - elapsedTime
+                            } else {
+                                // Cooldown period has passed
+                                timeRemainingForCooldown = nil
+                            }
+                        }
+                        
                         print("🚰 FAUCET MODE: Recipient \(recipient) has received \(totalSent) MON in total")
                         print("🚰 FAUCET MODE: New request would exceed limit: \(exceedsFaucetLimit)")
+                        if let remaining = timeRemainingForCooldown {
+                            print("🚰 FAUCET MODE: Time remaining for cooldown: \(formatTimeRemaining(remaining))")
+                        }
                         
                     } catch {
                         print("Error checking faucet limit: \(error)")
@@ -73,6 +99,20 @@ struct PaymentRequestCard: View {
                     }
                 }
             }
+        }
+    }
+    
+    // Helper to format the time remaining in a human-readable format
+    private func formatTimeRemaining(_ timeInterval: TimeInterval) -> String {
+        let hours = Int(timeInterval) / 3600
+        let minutes = (Int(timeInterval) % 3600) / 60
+        
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else if minutes > 0 {
+            return "\(minutes)m"
+        } else {
+            return "less than a minute"
         }
     }
     
@@ -109,23 +149,40 @@ struct PaymentRequestCard: View {
                             HStack(spacing: 20) {
                                 if settingsViewModel.selectedMode == .faucet && exceedsFaucetLimit {
                                     // If in faucet mode and limit exceeded, only show decline
-                                    Text("This wallet has exceeded the 0.05 MON limit")
-                                        .foregroundColor(.red)
-                                        .font(.subheadline)
-                                        .padding(.bottom, 8)
-                                    
-                                    Button(action: {
-                                        bleService.stopAdvertising() 
-                                        bleService.sendPaymentResponse(approved: false)
-                                        onPaymentAction(false)
-                                    }) {
-                                        Text("Decline")
-                                            .fontWeight(.semibold)
-                                            .frame(maxWidth: .infinity)
-                                            .padding()
-                                            .background(Color.red.opacity(0.1))
+                                    VStack(spacing: 8) {
+                                        Text("This wallet has exceeded the 0.05 MON limit")
                                             .foregroundColor(.red)
-                                            .cornerRadius(10)
+                                            .font(.subheadline)
+                                            .multilineTextAlignment(.center)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                            .frame(maxWidth: .infinity)
+                                            
+                                        // Display the actual time remaining until cooldown expires
+                                        if let remaining = timeRemainingForCooldown {
+                                            Text("Limit resets in \(formatTimeRemaining(remaining))")
+                                                .foregroundColor(.secondary)
+                                                .font(.caption)
+                                                .padding(.bottom, 4)
+                                        } else {
+                                            Text("Limit should reset soon")
+                                                .foregroundColor(.secondary)
+                                                .font(.caption)
+                                                .padding(.bottom, 4)
+                                        }
+                                        
+                                        Button(action: {
+                                            bleService.stopAdvertising() 
+                                            bleService.sendPaymentResponse(approved: false)
+                                            onPaymentAction(false)
+                                        }) {
+                                            Text("Decline")
+                                                .fontWeight(.semibold)
+                                                .frame(maxWidth: .infinity)
+                                                .padding()
+                                                .background(Color.red.opacity(0.1))
+                                                .foregroundColor(.red)
+                                                .cornerRadius(10)
+                                        }
                                     }
                                 } else {
                                     // Normal case - show both buttons
@@ -326,78 +383,5 @@ struct PaymentRequestCard: View {
         )
         .frame(height: 300)
         .padding(.horizontal)
-    }
-}
-
-#Preview("Faucet Limit Exceeded") {
-    ZStack {
-        LinearGradient(
-            gradient: Gradient(colors: [Color.blue.opacity(0.1), Color.purple.opacity(0.1)]),
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-        .edgesIgnoringSafeArea(.all)
-        
-        // The easiest approach is to modify the PaymentRequestCard struct
-        // to add an initializer parameter for preview purposes
-        PaymentRequestCardPreview()
-            .frame(height: 300)
-            .padding(.horizontal)
-    }
-}
-
-// Create a preview-specific version of the card
-struct PaymentRequestCardPreview: View {
-    var body: some View {
-        // Set up the view with proper settings mode
-        let settingsVM = SettingsViewModel.shared
-        settingsVM.selectedMode = .faucet
-        
-        return GeometryReader { geometry in
-            VStack(spacing: 12) {
-                Text("Payment Request")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                
-                Text("Amount: 0.06 MON")
-                    .font(.title2)
-                    .bold()
-                    .foregroundColor(.primary)
-                Text("From: 0x1234567890abcdef")
-                    .font(.subheadline)
-                    .lineLimit(1)
-                    .foregroundColor(.secondary)
-                    
-                Text("Note: Coffee")
-                    .font(.subheadline)
-                    .lineLimit(2)
-                    .foregroundColor(.secondary)
-                    .padding(.top, 2)
-                
-                // Simulate the exceeded limit view
-                Text("This wallet has exceeded the 0.05 MON limit")
-                    .foregroundColor(.red)
-                    .font(.subheadline)
-                    .padding(.bottom, 8)
-                
-                Button(action: {}) {
-                    Text("Decline")
-                        .fontWeight(.semibold)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.red.opacity(0.1))
-                        .foregroundColor(.red)
-                        .cornerRadius(10)
-                }
-            }
-            .padding(20)
-            .frame(width: geometry.size.width, height: nil)
-            .background(
-                .ultraThinMaterial,
-                in: RoundedRectangle(cornerRadius: 16)
-            )
-            .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
-            .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
-        }
     }
 } 
