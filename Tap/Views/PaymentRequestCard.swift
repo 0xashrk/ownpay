@@ -327,4 +327,77 @@ struct PaymentRequestCard: View {
         .frame(height: 300)
         .padding(.horizontal)
     }
+}
+
+#Preview("Faucet Limit Exceeded") {
+    ZStack {
+        LinearGradient(
+            gradient: Gradient(colors: [Color.blue.opacity(0.1), Color.purple.opacity(0.1)]),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .edgesIgnoringSafeArea(.all)
+        
+        // The easiest approach is to modify the PaymentRequestCard struct
+        // to add an initializer parameter for preview purposes
+        PaymentRequestCardPreview()
+            .frame(height: 300)
+            .padding(.horizontal)
+    }
+}
+
+// Create a preview-specific version of the card
+struct PaymentRequestCardPreview: View {
+    var body: some View {
+        // Set up the view with proper settings mode
+        let settingsVM = SettingsViewModel.shared
+        settingsVM.selectedMode = .faucet
+        
+        return GeometryReader { geometry in
+            VStack(spacing: 12) {
+                Text("Payment Request")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Text("Amount: 0.06 MON")
+                    .font(.title2)
+                    .bold()
+                    .foregroundColor(.primary)
+                Text("From: 0x1234567890abcdef")
+                    .font(.subheadline)
+                    .lineLimit(1)
+                    .foregroundColor(.secondary)
+                    
+                Text("Note: Coffee")
+                    .font(.subheadline)
+                    .lineLimit(2)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 2)
+                
+                // Simulate the exceeded limit view
+                Text("This wallet has exceeded the 0.05 MON limit")
+                    .foregroundColor(.red)
+                    .font(.subheadline)
+                    .padding(.bottom, 8)
+                
+                Button(action: {}) {
+                    Text("Decline")
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.red.opacity(0.1))
+                        .foregroundColor(.red)
+                        .cornerRadius(10)
+                }
+            }
+            .padding(20)
+            .frame(width: geometry.size.width, height: nil)
+            .background(
+                .ultraThinMaterial,
+                in: RoundedRectangle(cornerRadius: 16)
+            )
+            .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
+            .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+        }
+    }
 } 
