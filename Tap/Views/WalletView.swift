@@ -31,10 +31,7 @@ struct WalletView: View {
     
     init(isLoggedIn: Binding<Bool>) {
         _isLoggedIn = isLoggedIn
-        _settingsViewModel = StateObject(wrappedValue: SettingsViewModel(
-            privyService: PrivyService.shared,
-            bleService: BLEService()
-        ))
+        _settingsViewModel = StateObject(wrappedValue: SettingsViewModel.shared)
     }
     
     var body: some View {
@@ -44,8 +41,15 @@ struct WalletView: View {
                     // Wallet Address Section
                     BalanceView(isMerchantMode: $settingsViewModel.isMerchantMode)
                     
-                    if settingsViewModel.isMerchantMode {
+                    if settingsViewModel.selectedMode == .merchant {
                         MerchantView(showingRequestForm: $showingRequestForm, selectionGenerator: selectionGenerator)
+                    } else if settingsViewModel.selectedMode == .faucet {
+                        FaucetView(
+                            isScanning: $isScanning, 
+                            showingSendForm: $showingSendForm,
+                            selectionGenerator: selectionGenerator,
+                            bleService: bleService
+                        )
                     } else {
                         CustomerView(
                             isScanning: $isScanning, 
@@ -55,8 +59,8 @@ struct WalletView: View {
                         )
                     }
                     
-                    // Payment Requests (visible to customer)
-                    if !settingsViewModel.isMerchantMode, let message = bleService.receivedMessage, !hasProcessedRequest(message) {
+                    // Payment Requests (visible to customer or faucet)
+                    if settingsViewModel.selectedMode != .merchant, let message = bleService.receivedMessage, !hasProcessedRequest(message) {
                         PaymentRequestCard(message: message, bleService: bleService, onPaymentAction: { approved in
                             // Process the payment request only once
                             // Mark this request as processed immediately
@@ -117,7 +121,7 @@ struct WalletView: View {
                             
                             // Restart scanning after a short delay
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                if !settingsViewModel.isMerchantMode {
+                                if settingsViewModel.selectedMode != .merchant {
                                     bleService.startScanning()
                                 }
                             }
@@ -126,7 +130,7 @@ struct WalletView: View {
                     }
                     
                     // Payment Responses (visible to merchant)
-                    if settingsViewModel.isMerchantMode, let message = bleService.receivedMessage {
+                    if settingsViewModel.selectedMode == .merchant, let message = bleService.receivedMessage {
                         if message.starts(with: "PAYMENT_RESPONSE:") {
                             PaymentResponseCard(message: message)
                                 .padding(.horizontal)
@@ -191,21 +195,22 @@ struct WalletView: View {
                     showingSendForm = false
                 }
             }
-            .onChange(of: settingsViewModel.isMerchantMode) { newValue in
+            .onChange(of: settingsViewModel.selectedMode) { newValue in
+                print("Wallet View: Mode changed to \(newValue)")
                 // Stop existing scanning timer
                 scanTimer?.invalidate()
                 scanTimer = nil
                 
-                if newValue {
+                if newValue == .merchant {
                     // Merchant mode: stop scanning
                     bleService.stopScanning()
                     bleService.stopAdvertising() // Stop any previous advertising
                 } else {
-                    // Customer mode: start scanning, stop advertising
+                    // Customer or Faucet mode: start scanning, stop advertising
                     bleService.stopAdvertising()
                     bleService.startScanning()
                     
-                    // Start periodic scanning in customer mode
+                    // Start periodic scanning in customer/faucet mode
                     setupAutoScan()
                 }
             }
@@ -213,8 +218,8 @@ struct WalletView: View {
                 // Fetch balance with retry when view appears
                 fetchBalanceWithRetry()
                 
-                // Start automatic scanning when in customer mode
-                if !settingsViewModel.isMerchantMode {
+                // Start automatic scanning when not in merchant mode
+                if settingsViewModel.selectedMode != .merchant {
                     setupAutoScan()
                 }
             }
@@ -241,7 +246,7 @@ struct WalletView: View {
         
         // Create a new timer that scans every 10 seconds
         scanTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { _ in
-            if !settingsViewModel.isMerchantMode && bleService.receivedMessage == nil {
+            if settingsViewModel.selectedMode != .merchant && bleService.receivedMessage == nil {
                 withAnimation {
                     isScanning = true
                 }
@@ -356,6 +361,74 @@ struct CustomerView: View {
     var body: some View {
         // Customer View - shows status and send button
         VStack(spacing: 16) {
+            HStack {
+                Text(isScanning ? "Scanning..." : "Scanning for payment requests...")
+                    .foregroundColor(.secondary)
+                
+                // Added scan button
+                Button(action: {
+                    selectionGenerator.selectionChanged()
+                    withAnimation {
+                        isScanning = true
+                    }
+                    // Restart scanning
+                    bleService.stopScanning()
+                    bleService.startScanning()
+                    
+                    // Reset scanning indicator after 2 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation {
+                            isScanning = false
+                        }
+                    }
+                }) {
+                    HStack(spacing: 2) {
+                        Image(systemName: "qrcode.viewfinder")
+                            .font(.system(size: 18))
+                        Text("Scan")
+                            .font(.subheadline)
+                    }
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 10)
+                    .background(Color.blue.opacity(0.1))
+                    .foregroundColor(.blue)
+                    .cornerRadius(8)
+                }
+            }
+            .padding(.top)
+            .padding(.horizontal)
+            
+            Button(action: {
+                selectionGenerator.selectionChanged()
+                showingSendForm = true
+            }) {
+                HStack {
+                    Image(systemName: "paperplane.fill")
+                        .font(.system(size: 24))
+                    Text("Send MON")
+                        .font(.headline)
+                }
+                .foregroundColor(.blue)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.blue.opacity(0.1))
+                .cornerRadius(15)
+            }
+            .padding(.horizontal)
+        }
+    }
+}
+
+struct FaucetView: View {
+    @Binding var isScanning: Bool
+    @Binding var showingSendForm: Bool
+    let selectionGenerator: UISelectionFeedbackGenerator
+    let bleService: BLEService
+    
+    var body: some View {
+        // Customer View - shows status and send button
+        VStack(spacing: 16) {
+            Text("F mode")
             HStack {
                 Text(isScanning ? "Scanning..." : "Scanning for payment requests...")
                     .foregroundColor(.secondary)

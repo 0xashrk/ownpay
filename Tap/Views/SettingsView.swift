@@ -7,7 +7,7 @@ struct SettingsView: View {
     @State private var addressCopied = false
     
     init(privyService: PrivyService, bleService: BLEService, isLoggedIn: Binding<Bool>) {
-        _viewModel = StateObject(wrappedValue: SettingsViewModel(privyService: privyService, bleService: bleService))
+        _viewModel = StateObject(wrappedValue: SettingsViewModel.shared)
         _isLoggedIn = isLoggedIn
     }
     
@@ -49,13 +49,27 @@ struct SettingsView: View {
             }
             
             Section(header: Text("Wallet Mode")) {
-                Toggle(isOn: $viewModel.isMerchantMode) {
-                    HStack {
-                        Label(
-                            viewModel.isMerchantMode ? "Merchant Mode" : "Customer Mode",
-                            systemImage: viewModel.isMerchantMode ? "storefront" : "person"
-                        )
+                ForEach(WalletMode.allCases, id: \.self) { mode in
+                    Button(action: {
+                        viewModel.selectedMode = mode
+                        print("Settings View: Mode changed to \(mode)")
+                    }) {
+                        HStack {
+                            Image(systemName: iconForMode(mode))
+                                .foregroundColor(.blue)
+                                .frame(width: 30)
+                            
+                            Text(titleForMode(mode))
+                            
+                            Spacer()
+                            
+                            if viewModel.selectedMode == mode {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.blue)
+                            }
+                        }
                     }
+                    .foregroundColor(.primary)
                 }
             }
             
@@ -111,6 +125,28 @@ struct SettingsView: View {
             withAnimation {
                 addressCopied = false
             }
+        }
+    }
+    
+    private func iconForMode(_ mode: WalletMode) -> String {
+        switch mode {
+        case .customer:
+            return "person.fill"
+        case .merchant:
+            return "storefront.fill"
+        case .faucet:
+            return "drop.fill"
+        }
+    }
+    
+    private func titleForMode(_ mode: WalletMode) -> String {
+        switch mode {
+        case .customer:
+            return "Customer Mode"
+        case .merchant:
+            return "Merchant Mode"
+        case .faucet:
+            return "Faucet Mode"
         }
     }
 }
