@@ -16,7 +16,7 @@ struct WalletView: View {
     @Binding var isLoggedIn: Bool
     @State private var showingRequestForm = false
     @State private var showingSendForm = false
-    @State private var amount: String = "1" // Default to 1 MON
+    @State private var amount: String = "0.025" // Default to 0.025 MON
     @State private var showingPaymentSuccess = false
     @State private var isLoggingOut = false
     @State private var logoutError: String?
@@ -65,17 +65,22 @@ struct WalletView: View {
                        let message = bleService.receivedMessage, 
                        !paymentViewModel.hasProcessedRequest(message) {
                         
-                        PaymentRequestCard(message: message, bleService: bleService, onPaymentAction: { approved in
-                            _ = paymentViewModel.processPaymentRequest(
-                                message: message,
-                                approved: approved,
-                                modelContext: modelContext,
-                                privyService: privyService,
-                                bleService: bleService,
-                                settingsViewModel: settingsViewModel,
-                                playSound: playPaymentSound
-                            )
-                        })
+                        PaymentRequestCard(
+                            message: message,
+                            bleService: bleService,
+                            settingsViewModel: settingsViewModel,
+                            onPaymentAction: { approved in
+                                _ = paymentViewModel.processPaymentRequest(
+                                    message: message,
+                                    approved: approved,
+                                    modelContext: modelContext,
+                                    privyService: privyService,
+                                    bleService: bleService,
+                                    settingsViewModel: settingsViewModel,
+                                    playSound: playPaymentSound
+                                )
+                            }
+                        )
                         .padding(.horizontal)
                     }
                     
@@ -174,6 +179,18 @@ struct WalletView: View {
                 bleService.stopScanning()
                 bleService.stopAdvertising()
             }
+            .alert(
+                "Faucet Alert",
+                isPresented: $paymentViewModel.showingFaucetAlert,
+                actions: {
+                    Button("OK") {
+                        paymentViewModel.showingFaucetAlert = false
+                    }
+                },
+                message: {
+                    Text(paymentViewModel.faucetAlertMessage)
+                }
+            )
         }
         .onReceive(privyService.$authState) { state in
             if case .unauthenticated = state {

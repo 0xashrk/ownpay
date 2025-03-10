@@ -6,6 +6,8 @@ class PaymentViewModel: ObservableObject {
     @Published var showingPaymentSuccess = false
     @Published var currentTransactionDetails: [String: String] = [:]
     @Published var processedRequests = Set<String>()
+    @Published var showingFaucetAlert = false
+    @Published var faucetAlertMessage = ""
     
     private let paymentSuccessGenerator = UINotificationFeedbackGenerator()
     
@@ -100,60 +102,61 @@ class PaymentViewModel: ObservableObject {
             processedRequests.insert(requestId)
         }
         
-        // For faucet mode: check if payment exceeds limit
+        // Extract transaction details from the message
+        let components = message.split(separator: ":")
+        if components.count < 3 { return false }
+        
+        // For faucet mode: check limit before approving
+        var shouldReject = false
         if settingsViewModel.selectedMode == .faucet && approved {
             let allowPayment = processFaucetPayment(message: message, modelContext: modelContext)
             if !allowPayment {
-                // Payment exceeds faucet limit - don't process it
-                paymentSuccessGenerator.notificationOccurred(.error)
-                bleService.receivedMessage = nil
+                // Show alert for faucet limit
+                faucetAlertMessage = "Payment rejected: This wallet has already received more than 0.05 MON."
+                showingFaucetAlert = true
                 
-                // Restart scanning after a short delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    if settingsViewModel.selectedMode != .merchant {
-                        bleService.startScanning()
-                    }
-                }
-                return true // Handled (rejected)
+                // Mark as not approved - this will prevent actual payment
+                shouldReject = true
+                
+                // Log the rejection attempt (optional)
+                print("⛔️ PAYMENT REJECTED: Faucet limit exceeded")
             }
         }
         
-        if approved {
-            // Extract transaction details from the message
-            let components = message.split(separator: ":")
-            if components.count >= 3 {
-                // Generate transaction hash
-                let txHash = "0x" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
-                
-                // Store transaction details
-                self.currentTransactionDetails = [
-                    "hash": txHash,
-                    "amount": String(components[1]),
-                    "sender": privyService.walletAddress ?? "Unknown",
-                    "recipient": String(components[2]),
-                    "note": components.count >= 4 ? String(components[3]) : ""
-                ]
-                
-                // Save the transaction to SwiftData for the customer
-                let customerTransaction = PaymentTransaction(
-                    isApproved: true,
-                    transactionHash: txHash,
-                    amount: String(components[1]),
-                    sender: privyService.walletAddress ?? "Unknown",
-                    recipient: String(components[2]),
-                    note: components.count >= 4 ? String(components[3]) : "",
-                    type: .sent,  // Important! This is a SENT transaction for the customer
-                    status: .completed
-                )
-                modelContext.insert(customerTransaction)
-                try? modelContext.save()
-            }
+        // Only proceed with payment if approved AND not rejected due to limits
+        if approved && !shouldReject {
+            // Generate transaction hash
+            let txHash = "0x" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+            
+            // Store transaction details
+            self.currentTransactionDetails = [
+                "hash": txHash,
+                "amount": String(components[1]),
+                "sender": privyService.walletAddress ?? "Unknown",
+                "recipient": String(components[2]),
+                "note": components.count >= 4 ? String(components[3]) : ""
+            ]
+            
+            // Save the transaction to SwiftData for the customer
+            let customerTransaction = PaymentTransaction(
+                isApproved: true,
+                transactionHash: txHash,
+                amount: String(components[1]),
+                sender: privyService.walletAddress ?? "Unknown",
+                recipient: String(components[2]),
+                note: components.count >= 4 ? String(components[3]) : "",
+                type: .sent,
+                status: .completed
+            )
+            modelContext.insert(customerTransaction)
+            try? modelContext.save()
             
             playSound()
             paymentSuccessGenerator.notificationOccurred(.success)
             withAnimation {
                 showingPaymentSuccess = true
             }
+            
             // Show success message for longer (5 seconds)
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                 withAnimation {
@@ -161,6 +164,7 @@ class PaymentViewModel: ObservableObject {
                 }
             }
         } else {
+            // Transaction was rejected - either manually or due to limit
             paymentSuccessGenerator.notificationOccurred(.error)
         }
         

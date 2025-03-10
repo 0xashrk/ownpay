@@ -14,6 +14,11 @@ struct RequestPaymentFormView: View {
     @Environment(\.dismiss) var dismiss
     
     init(amount: Binding<String>, onRequest: @escaping (Double, String) -> Void) {
+        // Initialize with default 0.025 value
+        let defaultAmount = "0.025"
+        if amount.wrappedValue.isEmpty || amount.wrappedValue == "1" {
+            amount.wrappedValue = defaultAmount
+        }
         _viewModel = StateObject(wrappedValue: RequestPaymentViewModel(amount: amount, onRequest: onRequest))
     }
     
@@ -28,6 +33,7 @@ struct RequestPaymentFormView: View {
                         
                         TextField("Amount (MON)", text: $viewModel.amount)
                             .padding()
+                            .keyboardType(.decimalPad) // Add decimal keyboard
                             .background(Color.gray.opacity(0.1))
                             .cornerRadius(10)
                         
@@ -41,7 +47,7 @@ struct RequestPaymentFormView: View {
                                 Button(action: {
                                     viewModel.setQuickPaymentAmount(amount)
                                 }) {
-                                    Text(String(format: "%.1f", amount))
+                                    Text(String(format: "%.3f", amount))
                                         .font(.system(.body, design: .monospaced))
                                         .foregroundColor(.white)
                                         .frame(maxWidth: .infinity)

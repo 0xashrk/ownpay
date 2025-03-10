@@ -1,10 +1,15 @@
 import SwiftUI
 import AVFoundation
+import SwiftData
 
 struct PaymentRequestCard: View {
     let message: String
     let bleService: BLEService
     let onPaymentAction: (Bool) -> Void
+    @State private var exceedsFaucetLimit: Bool = false
+    @StateObject private var paymentViewModel = PaymentViewModel()
+    @Environment(\.modelContext) private var modelContext
+    let settingsViewModel: SettingsViewModel
     @StateObject private var privyService = PrivyService.shared
     @State private var paymentState: PaymentState = .initial
     @State private var rotationDegrees = 0.0
@@ -14,6 +19,61 @@ struct PaymentRequestCard: View {
         case processing
         case completed
         case failed
+    }
+    
+    init(message: String, bleService: BLEService, settingsViewModel: SettingsViewModel, onPaymentAction: @escaping (Bool) -> Void) {
+        self.message = message
+        self.bleService = bleService
+        self.settingsViewModel = settingsViewModel
+        self.onPaymentAction = onPaymentAction
+    }
+    
+    private func checkFaucetLimit() {
+        if settingsViewModel.selectedMode == .faucet {
+            // Parse message to get recipient and amount
+            if message.starts(with: "PAYMENT_REQUEST:") {
+                let components = message.split(separator: ":")
+                if components.count >= 3 {
+                    let recipient = String(components[2])
+                    let requestedAmount = Double(String(components[1])) ?? 0.0
+                    
+                    // Create a descriptor with explicit type
+                    let descriptor = FetchDescriptor<PaymentTransaction>()
+                    
+                    do {
+                        // Query SwiftData for all transactions
+                        let allPayments = try modelContext.fetch(descriptor)
+                        
+                        // Filter transactions in memory to avoid predicate issues
+                        let matchingPayments = allPayments.filter { payment in
+                            guard let paymentRecipient = payment.recipient else {
+                                return false
+                            }
+                            return paymentRecipient == recipient && payment.isApproved == true
+                        }
+                        
+                        // Calculate total amount already sent
+                        var totalSent = 0.0
+                        for payment in matchingPayments {
+                            if let amountString = payment.amount, 
+                               let amount = Double(amountString) {
+                                totalSent += amount
+                            }
+                        }
+                        
+                        // Check if exceeds limit
+                        exceedsFaucetLimit = (totalSent + requestedAmount > 0.05)
+                        
+                        print("🚰 FAUCET MODE: Recipient \(recipient) has received \(totalSent) MON in total")
+                        print("🚰 FAUCET MODE: New request would exceed limit: \(exceedsFaucetLimit)")
+                        
+                    } catch {
+                        print("Error checking faucet limit: \(error)")
+                        exceedsFaucetLimit = false // Be conservative
+                    }
+                }
+            }
+        }
     }
     
     var body: some View {
@@ -47,86 +107,111 @@ struct PaymentRequestCard: View {
                         switch paymentState {
                         case .initial:
                             HStack(spacing: 20) {
-                                Button(action: {
-                                    bleService.stopAdvertising() 
-                                    bleService.sendPaymentResponse(approved: false)
-                                    onPaymentAction(false)
-                                }) {
-                                    Text("Decline")
+                                if settingsViewModel.selectedMode == .faucet && exceedsFaucetLimit {
+                                    // If in faucet mode and limit exceeded, only show decline
+                                    Text("This wallet has exceeded the 0.05 MON limit")
                                         .foregroundColor(.red)
-                                        .padding(.vertical, 8)
-                                        .padding(.horizontal, 20)
-                                        .background(Color.red.opacity(0.1))
-                                        .cornerRadius(8)
-                                }
-                                
-                                Button(action: {
-                                    // Start payment flow
-                                    withAnimation {
-                                        paymentState = .processing
+                                        .font(.subheadline)
+                                        .padding(.bottom, 8)
+                                    
+                                    Button(action: {
+                                        bleService.stopAdvertising() 
+                                        bleService.sendPaymentResponse(approved: false)
+                                        onPaymentAction(false)
+                                    }) {
+                                        Text("Decline")
+                                            .fontWeight(.semibold)
+                                            .frame(maxWidth: .infinity)
+                                            .padding()
+                                            .background(Color.red.opacity(0.1))
+                                            .foregroundColor(.red)
+                                            .cornerRadius(10)
+                                    }
+                                } else {
+                                    // Normal case - show both buttons
+                                    Button(action: {
+                                        bleService.stopAdvertising() 
+                                        bleService.sendPaymentResponse(approved: false)
+                                        onPaymentAction(false)
+                                    }) {
+                                        Text("Decline")
+                                            .fontWeight(.semibold)
+                                            .frame(maxWidth: .infinity)
+                                            .padding()
+                                            .background(Color.red.opacity(0.1))
+                                            .foregroundColor(.red)
+                                            .cornerRadius(10)
                                     }
                                     
-                                    // Sound feedback like Apple Pay
-                                    AudioServicesPlaySystemSound(1519) // Standard Apple Pay begin sound
-                                    
-                                    // Start rotation animation
-                                    withAnimation(Animation.linear(duration: 1.0).repeatForever(autoreverses: false)) {
-                                        rotationDegrees = 360
-                                    }
-                                    
-                                    // Process the transaction
-                                    if let amount = Double(components[1]),
-                                       let recipientAddress = String(components[2]) as String? {
-                                        Task {
-                                            do {
-                                                try await privyService.sendTransaction(amount: amount, to: recipientAddress)
-                                                
-                                                // Success animation before completing
-                                                withAnimation {
-                                                    paymentState = .completed
-                                                }
-                                                
-                                                // Wait for animation to complete
-                                                try? await Task.sleep(nanoseconds: 800_000_000)
-                                                
-                                                // Notify payment complete with transaction details
-                                                bleService.stopAdvertising()
-                                                bleService.sendPaymentResponse(
-                                                    approved: true,
-                                                    transactionDetails: [
-                                                        "hash": "0x" + UUID().uuidString.replacingOccurrences(of: "-", with: ""), // Replace with actual tx hash
-                                                        "amount": "\(amount)",
-                                                        "sender": privyService.walletAddress ?? "Unknown",
-                                                        "recipient": recipientAddress,
-                                                        "note": components.count >= 4 ? String(components[3]) : ""
-                                                    ]
-                                                )
-                                                onPaymentAction(true)
-                                            } catch {
-                                                print("Error sending transaction: \(error)")
+                                    Button(action: {
+                                        // Start payment flow
+                                        withAnimation {
+                                            paymentState = .processing
+                                        }
+                                        
+                                        // Sound feedback like Apple Pay
+                                        AudioServicesPlaySystemSound(1519) // Standard Apple Pay begin sound
+                                        
+                                        // Start rotation animation
+                                        withAnimation(Animation.linear(duration: 1.0).repeatForever(autoreverses: false)) {
+                                            rotationDegrees = 360
+                                        }
+                                        
+                                        // Process the transaction
+                                        if let amount = Double(components[1]),
+                                           let recipientAddress = String(components[2]) as String? {
+                                            Task {
+                                                do {
+                                                    try await privyService.sendTransaction(amount: amount, to: recipientAddress)
+                                                    
+                                                    // Success animation before completing
+                                                    withAnimation {
+                                                        paymentState = .completed
+                                                    }
+                                                    
+                                                    // Wait for animation to complete
+                                                    try? await Task.sleep(nanoseconds: 800_000_000)
+                                                    
+                                                    // Notify payment complete with transaction details
+                                                    bleService.stopAdvertising()
+                                                    bleService.sendPaymentResponse(
+                                                        approved: true,
+                                                        transactionDetails: [
+                                                            "hash": "0x" + UUID().uuidString.replacingOccurrences(of: "-", with: ""), // Replace with actual tx hash
+                                                            "amount": "\(amount)",
+                                                            "sender": privyService.walletAddress ?? "Unknown",
+                                                            "recipient": recipientAddress,
+                                                            "note": components.count >= 4 ? String(components[3]) : ""
+                                                        ]
+                                                    )
+                                                    onPaymentAction(true)
+                                                } catch {
+                                                    print("Error sending transaction: \(error)")
 
-                                                // Failure animation
-                                                withAnimation {
-                                                    paymentState = .failed
+                                                    // Failure animation
+                                                    withAnimation {
+                                                        paymentState = .failed
+                                                    }
+                                                    
+                                                    // Wait for animation to complete
+                                                    try? await Task.sleep(nanoseconds: 800_000_000)
+                                                    
+                                                    // Notify payment failed
+                                                    bleService.stopAdvertising()
+                                                    bleService.sendPaymentResponse(approved: false)
+                                                    onPaymentAction(false)
                                                 }
-                                                
-                                                // Wait for animation to complete
-                                                try? await Task.sleep(nanoseconds: 800_000_000)
-                                                
-                                                // Notify payment failed
-                                                bleService.stopAdvertising()
-                                                bleService.sendPaymentResponse(approved: false)
-                                                onPaymentAction(false)
                                             }
                                         }
+                                    }) {
+                                        Text("Pay")
+                                            .fontWeight(.semibold)
+                                            .frame(maxWidth: .infinity)
+                                            .padding()
+                                            .background(Color.green)
+                                            .foregroundColor(.white)
+                                            .cornerRadius(10)
                                     }
-                                }) {
-                                    Text("Pay")
-                                        .foregroundColor(.white)
-                                        .padding(.vertical, 8)
-                                        .padding(.horizontal, 20)
-                                        .background(Color.blue)
-                                        .cornerRadius(8)
                                 }
                             }
                             .padding(.top, 8)
@@ -216,6 +301,9 @@ struct PaymentRequestCard: View {
             .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
             // This ensures proper vertical positioning
             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+            .onAppear {
+                checkFaucetLimit()
+            }
         }
     }
 }
@@ -233,6 +321,7 @@ struct PaymentRequestCard: View {
         PaymentRequestCard(
             message: "PAYMENT_REQUEST:10:0x1234567890abcdef:Coffee",
             bleService: BLEService(),
+            settingsViewModel: SettingsViewModel.shared,
             onPaymentAction: { _ in }
         )
         .frame(height: 300)
