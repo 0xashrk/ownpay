@@ -11,16 +11,16 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		CFB540412D753B3F002BAB36 /* Tap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tap.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CFB540412D753B3F002BAB36 /* Own Pay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Own Pay.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		CFB5409E2D7545AE002BAB36 /* Exceptions for "Tap" folder in "Tap" target */ = {
+		CFB5409E2D7545AE002BAB36 /* Exceptions for "Tap" folder in "Own Pay" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = CFB540402D753B3F002BAB36 /* Tap */;
+			target = CFB540402D753B3F002BAB36 /* Own Pay */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -28,7 +28,7 @@
 		CFB540432D753B3F002BAB36 /* Tap */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				CFB5409E2D7545AE002BAB36 /* Exceptions for "Tap" folder in "Tap" target */,
+				CFB5409E2D7545AE002BAB36 /* Exceptions for "Tap" folder in "Own Pay" target */,
 			);
 			path = Tap;
 			sourceTree = "<group>";
@@ -58,7 +58,7 @@
 		CFB540422D753B3F002BAB36 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				CFB540412D753B3F002BAB36 /* Tap.app */,
+				CFB540412D753B3F002BAB36 /* Own Pay.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -66,9 +66,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		CFB540402D753B3F002BAB36 /* Tap */ = {
+		CFB540402D753B3F002BAB36 /* Own Pay */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = CFB5404F2D753B40002BAB36 /* Build configuration list for PBXNativeTarget "Tap" */;
+			buildConfigurationList = CFB5404F2D753B40002BAB36 /* Build configuration list for PBXNativeTarget "Own Pay" */;
 			buildPhases = (
 				CFB5403D2D753B3F002BAB36 /* Sources */,
 				CFB5403E2D753B3F002BAB36 /* Frameworks */,
@@ -81,12 +81,12 @@
 			fileSystemSynchronizedGroups = (
 				CFB540432D753B3F002BAB36 /* Tap */,
 			);
-			name = Tap;
+			name = "Own Pay";
 			packageProductDependencies = (
 				CFB540AC2D75648B002BAB36 /* Privy */,
 			);
 			productName = Tap;
-			productReference = CFB540412D753B3F002BAB36 /* Tap.app */;
+			productReference = CFB540412D753B3F002BAB36 /* Own Pay.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -104,7 +104,7 @@
 					};
 				};
 			};
-			buildConfigurationList = CFB5403C2D753B3F002BAB36 /* Build configuration list for PBXProject "Tap" */;
+			buildConfigurationList = CFB5403C2D753B3F002BAB36 /* Build configuration list for PBXProject "Own Pay" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -121,7 +121,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				CFB540402D753B3F002BAB36 /* Tap */,
+				CFB540402D753B3F002BAB36 /* Own Pay */,
 			);
 		};
 /* End PBXProject section */
@@ -329,7 +329,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		CFB5403C2D753B3F002BAB36 /* Build configuration list for PBXProject "Tap" */ = {
+		CFB5403C2D753B3F002BAB36 /* Build configuration list for PBXProject "Own Pay" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				CFB5404D2D753B40002BAB36 /* Debug */,
@@ -338,7 +338,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		CFB5404F2D753B40002BAB36 /* Build configuration list for PBXNativeTarget "Tap" */ = {
+		CFB5404F2D753B40002BAB36 /* Build configuration list for PBXNativeTarget "Own Pay" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				CFB540502D753B40002BAB36 /* Debug */,
