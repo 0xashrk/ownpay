@@ -6,9 +6,18 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		CFB540AD2D75648B002BAB36 /* Privy in Frameworks */ = {isa = PBXBuildFile; productRef = CFB540AC2D75648B002BAB36 /* Privy */; };
-/* End PBXBuildFile section */
+/* Begin PBXCopyFilesBuildPhase section */
+		CF5F9F2C2D7FB98600429B59 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		CFB540412D753B3F002BAB36 /* Own Pay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Own Pay.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -24,11 +33,25 @@
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		CF5F9F2D2D7FB98600429B59 /* Exceptions for "Tap" folder in "Embed Frameworks" phase from "Own Pay" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			attributesByRelativePath = {
+				PrivySDK.xcframework = (CodeSignOnCopy, RemoveHeadersOnCopy, );
+			};
+			buildPhase = CF5F9F2C2D7FB98600429B59 /* Embed Frameworks */;
+			membershipExceptions = (
+				PrivySDK.xcframework,
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		CFB540432D753B3F002BAB36 /* Tap */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				CFB5409E2D7545AE002BAB36 /* Exceptions for "Tap" folder in "Own Pay" target */,
+				CF5F9F2D2D7FB98600429B59 /* Exceptions for "Tap" folder in "Embed Frameworks" phase from "Own Pay" target */,
 			);
 			path = Tap;
 			sourceTree = "<group>";
@@ -40,7 +63,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CFB540AD2D75648B002BAB36 /* Privy in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -73,6 +95,7 @@
 				CFB5403D2D753B3F002BAB36 /* Sources */,
 				CFB5403E2D753B3F002BAB36 /* Frameworks */,
 				CFB5403F2D753B3F002BAB36 /* Resources */,
+				CF5F9F2C2D7FB98600429B59 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -83,7 +106,6 @@
 			);
 			name = "Own Pay";
 			packageProductDependencies = (
-				CFB540AC2D75648B002BAB36 /* Privy */,
 			);
 			productName = Tap;
 			productReference = CFB540412D753B3F002BAB36 /* Own Pay.app */;
@@ -114,7 +136,6 @@
 			mainGroup = CFB540382D753B3F002BAB36;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				CFB540AB2D75648B002BAB36 /* XCRemoteSwiftPackageReference "privy-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CFB540422D753B3F002BAB36 /* Products */;
@@ -348,25 +369,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		CFB540AB2D75648B002BAB36 /* XCRemoteSwiftPackageReference "privy-ios" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/privy-io/privy-ios";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.9.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		CFB540AC2D75648B002BAB36 /* Privy */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = CFB540AB2D75648B002BAB36 /* XCRemoteSwiftPackageReference "privy-ios" */;
-			productName = Privy;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = CFB540392D753B3F002BAB36 /* Project object */;
 }

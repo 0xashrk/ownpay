@@ -1,0 +1,11 @@
+framework module PrivySDK {
+  umbrella header "PrivySDK.h"
+  export *
+
+  module * { export * }
+}
+
+module PrivySDK.Swift {
+  header "PrivySDK-Swift.h"
+  requires objc
+}
