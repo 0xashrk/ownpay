@@ -47,7 +47,7 @@ class PaymentViewModel: ObservableObject {
         let requestedAmount = Double(String(components[1])) ?? 0.0
         
         // Create a descriptor to query SwiftData
-        var descriptor = FetchDescriptor<PaymentTransaction>()
+        let descriptor = FetchDescriptor<PaymentTransaction>()
         
         do {
             // Query SwiftData for all transactions
