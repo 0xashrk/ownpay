@@ -14,11 +14,17 @@ class SettingsViewModel: ObservableObject {
         bleService: BLEService()
     )
     
-    @Published var selectedMode: WalletMode = .customer {
+    // UserDefaults key for wallet mode
+    private static let walletModeKey = "selectedWalletMode"
+    
+    // Published property that syncs with UserDefaults
+    @Published var selectedMode: WalletMode {
         didSet {
             print("Mode changed to: \(selectedMode)")
             // Update isMerchantMode for backward compatibility
             isMerchantMode = selectedMode == .merchant
+            // Save to UserDefaults
+            UserDefaults.standard.set(selectedMode.rawValue, forKey: Self.walletModeKey)
         }
     }
     
@@ -42,6 +48,17 @@ class SettingsViewModel: ObservableObject {
     init(privyService: PrivyService, bleService: BLEService) {
         self.privyService = privyService
         self.bleService = bleService
+        
+        // Load saved mode from UserDefaults, default to customer if not found
+        if let savedModeString = UserDefaults.standard.string(forKey: Self.walletModeKey),
+           let savedMode = WalletMode(rawValue: savedModeString) {
+            self.selectedMode = savedMode
+        } else {
+            self.selectedMode = .customer
+        }
+        
+        // Ensure isMerchantMode is consistent with selectedMode on initialization
+        self.isMerchantMode = self.selectedMode == .merchant
     }
     
     func logout() async {
