@@ -17,6 +17,9 @@ class SettingsViewModel: ObservableObject {
     // UserDefaults key for wallet mode
     private static let walletModeKey = "selectedWalletMode"
     
+    // Admin password
+    private let adminPassword = "535445"
+    
     // Published property that syncs with UserDefaults
     @Published var selectedMode: WalletMode {
         didSet {
@@ -41,6 +44,12 @@ class SettingsViewModel: ObservableObject {
     
     @Published var isLoggingOut = false
     @Published var logoutError: String?
+    
+    // Password protection properties
+    @Published var showingPasswordPrompt = false
+    @Published var enteredPassword = ""
+    @Published var passwordError = false
+    @Published var isPasswordVerified = false
     
     let privyService: PrivyService
     let bleService: BLEService
@@ -74,5 +83,19 @@ class SettingsViewModel: ObservableObject {
     
     func toggleMerchantMode() {
         isMerchantMode.toggle()
+    }
+    
+    // Password verification
+    func verifyPassword(_ password: String) -> Bool {
+        let isCorrect = password == adminPassword
+        passwordError = !isCorrect
+        isPasswordVerified = isCorrect
+        return isCorrect
+    }
+    
+    func resetPasswordState() {
+        enteredPassword = ""
+        isPasswordVerified = false
+        passwordError = false
     }
 } 
