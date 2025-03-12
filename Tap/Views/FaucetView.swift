@@ -54,24 +54,6 @@ struct FaucetView: View {
             .padding(.top)
             .padding(.horizontal)
             
-            Button(action: {
-                selectionGenerator.selectionChanged()
-                showingSendForm = true
-            }) {
-                HStack {
-                    Image(systemName: "paperplane.fill")
-                        .font(.system(size: 24))
-                    Text("Send MON")
-                        .font(.headline)
-                }
-                .foregroundColor(.blue)
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.blue.opacity(0.1))
-                .cornerRadius(15)
-            }
-            .padding(.horizontal)
-            
             // Updated wallet address scan button
             Button(action: {
                 selectionGenerator.selectionChanged()
