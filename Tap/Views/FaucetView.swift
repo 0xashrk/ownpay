@@ -16,7 +16,7 @@ struct FaucetView: View {
     var body: some View {
         VStack(spacing: 16) {
             HStack {
-                Text(isScanning ? "Scanning..." : "Scanning for payment requests...")
+                Text(isScanning ? "Discovering..." : "Ready to detect requests")
                     .foregroundColor(.secondary)
                 
                 // Added scan button
@@ -37,9 +37,9 @@ struct FaucetView: View {
                     }
                 }) {
                     HStack(spacing: 2) {
-                        Image(systemName: "qrcode.viewfinder")
+                        Image(systemName: "wave.3.right")
                             .font(.system(size: 18))
-                        Text("Scan")
+                        Text("Discover")
                             .font(.subheadline)
                     }
                     .padding(.vertical, 6)
