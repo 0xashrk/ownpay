@@ -20,6 +20,8 @@
 	<string>This app uses Bluetooth to send and receive messages between devices.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>This app uses Bluetooth to send and receive messages between devices.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs camera access to scan QR codes for wallet addresses.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
