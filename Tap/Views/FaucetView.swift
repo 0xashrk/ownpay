@@ -6,14 +6,19 @@
 //
 
 import SwiftUI
-import AVFoundation // Add this import for camera access
+import AVFoundation
+import SwiftData
 
 struct FaucetView: View {
     @Binding var isScanning: Bool
     @Binding var showingSendForm: Bool
     let selectionGenerator: UISelectionFeedbackGenerator
     let bleService: BLEService
-    @State private var showingQRScanner = false // New state for QR scanner
+    @State private var showingQRScanner = false
+    @StateObject private var privyService = PrivyService.shared
+    @StateObject private var paymentViewModel = PaymentViewModel()
+    @Environment(\.modelContext) private var modelContext
+    @State private var scannedAddress: String? = nil
     
     var body: some View {
         VStack(spacing: 16) {
@@ -57,7 +62,7 @@ struct FaucetView: View {
             // Updated wallet address scan button
             Button(action: {
                 selectionGenerator.selectionChanged()
-                showingQRScanner = true // Show camera scanner
+                showingQRScanner = true
             }) {
                 HStack {
                     Image(systemName: "qrcode.viewfinder")
@@ -72,14 +77,67 @@ struct FaucetView: View {
                 .cornerRadius(15)
             }
             .padding(.horizontal)
+            
+            // Display PaymentRequestCard for scanned address if available
+            if let address = scannedAddress {
+                // Create a simulated payment request in the format that PaymentRequestCard expects
+                let requestMessage = "PAYMENT_REQUEST:0.05:\(address):Faucet Payment:QRScan"
+                
+                PaymentRequestCard(
+                    message: requestMessage,
+                    bleService: bleService,
+                    settingsViewModel: SettingsViewModel.shared,
+                    onPaymentAction: { approved in
+                        _ = paymentViewModel.processPaymentRequest(
+                            message: requestMessage,
+                            approved: approved,
+                            modelContext: modelContext,
+                            privyService: privyService,
+                            bleService: bleService,
+                            settingsViewModel: SettingsViewModel.shared,
+                            playSound: { AudioServicesPlaySystemSound(1407) }
+                        )
+                        
+                        // Clear the scanned address to remove the card after processing
+                        if approved {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                scannedAddress = nil
+                            }
+                        } else {
+                            scannedAddress = nil
+                        }
+                    }
+                )
+                .padding(.horizontal)
+            }
+        }
+        .overlay {
+            if paymentViewModel.showingPaymentSuccess {
+                PaymentSuccessView(transactionDetails: paymentViewModel.currentTransactionDetails)
+                    .transition(.scale.combined(with: .opacity))
+            }
         }
         .sheet(isPresented: $showingQRScanner) {
-            // This would be your QR code scanner view
             QRScannerView { result in
                 print("Scanned wallet address: \(result)")
                 showingQRScanner = false
+                
+                // Set the scanned address to trigger the PaymentRequestCard
+                scannedAddress = result
             }
         }
+        .alert(
+            "Faucet Alert",
+            isPresented: $paymentViewModel.showingFaucetAlert,
+            actions: {
+                Button("OK") {
+                    paymentViewModel.showingFaucetAlert = false
+                }
+            },
+            message: {
+                Text(paymentViewModel.faucetAlertMessage)
+            }
+        )
     }
 }
 
@@ -178,3 +236,4 @@ struct QRScannerView: UIViewControllerRepresentable {
     )
     .padding()
 }
+
