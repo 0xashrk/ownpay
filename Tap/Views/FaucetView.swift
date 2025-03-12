@@ -14,7 +14,6 @@ struct FaucetView: View {
     let bleService: BLEService
     
     var body: some View {
-        // Customer View - shows status and send button
         VStack(spacing: 16) {
             HStack {
                 Text(isScanning ? "Scanning..." : "Scanning for payment requests...")
@@ -72,4 +71,14 @@ struct FaucetView: View {
             .padding(.horizontal)
         }
     }
+}
+
+#Preview {
+    FaucetView(
+        isScanning: .constant(false),
+        showingSendForm: .constant(false),
+        selectionGenerator: UISelectionFeedbackGenerator(),
+        bleService: BLEService()
+    )
+    .padding()
 }

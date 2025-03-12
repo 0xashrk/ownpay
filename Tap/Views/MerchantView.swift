@@ -54,3 +54,12 @@ struct MerchantView: View {
         }
     }
 }
+
+#Preview {
+    MerchantView(
+        showingRequestForm: .constant(false),
+        showingSendForm: .constant(false),
+        selectionGenerator: UISelectionFeedbackGenerator()
+    )
+    .padding()
+}
