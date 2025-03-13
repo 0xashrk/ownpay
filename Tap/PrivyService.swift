@@ -39,6 +39,9 @@ class PrivyService: ObservableObject {
         "iconUrls": ["https://testnet-explorer.monad.xyz/favicon.ico"]
     ]
     
+    // Add this property to track pending balance requests
+    private var balanceRequestTask: Task<Void, Never>?
+    
     private init() {
         print("Initializing PrivyService with appId: \(Config.privyAppId)")
         print("Client ID: \(Config.privyClientId)")
@@ -213,66 +216,111 @@ class PrivyService: ObservableObject {
     
     @MainActor
     func fetchBalance() async {
-        guard let address = walletAddress else {
-            print("No wallet address available")
-            self.balance = "No wallet"
-            return
+        // Cancel any pending balance request
+        balanceRequestTask?.cancel()
+        
+        // Create a new task for this request
+        balanceRequestTask = Task {
+            guard let address = walletAddress else {
+                print("No wallet address available")
+                self.balance = "No wallet"
+                return
+            }
+            
+            do {
+                print("Fetching balance for address: \(address)")
+                // Add a small delay to prevent rapid consecutive requests
+                try await Task.sleep(nanoseconds: 500_000_000) // 500ms
+                
+                // Check if task was cancelled during the delay
+                if Task.isCancelled { return }
+                
+                // Fetch native token balance
+                let url = URL(string: monadRPCURL)!
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                
+                // Get native token balance
+                let nativeBalanceJson: [String: Any] = [
+                    "jsonrpc": "2.0",
+                    "method": "eth_getBalance",
+                    "params": [address, "latest"],
+                    "id": 1
+                ]
+                
+                print("Sending request with JSON: \(nativeBalanceJson)")
+                request.httpBody = try JSONSerialization.data(withJSONObject: nativeBalanceJson)
+                let (data, _) = try await URLSession.shared.data(for: request)
+                let responseString = String(data: data, encoding: .utf8) ?? "Could not decode response"
+                print("Received response: \(responseString)")
+                
+                // First try to decode as error response
+                if let errorResponse = try? JSONDecoder().decode(JSONRPCErrorResponse.self, from: data) {
+                    print("RPC Error: \(errorResponse.error.message)")
+                    throw WalletError.rpcError(errorResponse.error.message)
+                }
+                
+                // If not an error, decode as success response
+                let response = try JSONDecoder().decode(JSONRPCResponse.self, from: data)
+                
+                // Convert hex balance to MON (since we're on Monad testnet)
+                let balanceHex = response.result
+                print("Raw balance hex: \(balanceHex)")
+                
+                // Use this approach to handle large hex values
+                func hexToMON(hexString: String) -> Double {
+                    // Remove "0x" prefix if present
+                    let cleanHex = hexString.hasPrefix("0x") ? String(hexString.dropFirst(2)) : hexString
+                    
+                    // Convert hex to decimal string manually (handling arbitrary size)
+                    var decimalValue: Decimal = 0
+                    for char in cleanHex {
+                        let digitValue: UInt8
+                        switch char.lowercased() {
+                        case "0"..."9": 
+                            digitValue = UInt8(String(char))!
+                        case "a"..."f": 
+                            digitValue = UInt8(char.asciiValue! - Character("a").asciiValue! + 10)
+                        default:
+                            continue
+                        }
+                        decimalValue = decimalValue * 16 + Decimal(digitValue)
+                    }
+                    
+                    // Divide by 10^18 to get MON value
+                    let divisor = pow(Decimal(10), 18)
+                    let monValue = decimalValue / divisor
+                    
+                    return NSDecimalNumber(decimal: monValue).doubleValue
+                }
+                
+                // Use the function to convert
+                let balance = hexToMON(hexString: balanceHex)
+                print("Converted balance: \(balance) MON")
+                
+                // Update balance on main thread with proper formatting
+                self.balance = String(format: "%.5f MON", balance)
+                self.monBalance = nil // Clear MON balance since it's the same as native balance
+                
+                // Force UI update
+                await MainActor.run {
+                    self.objectWillChange.send()
+                }
+            } catch {
+                if let nsError = error as NSError?, nsError.domain == NSURLErrorDomain && nsError.code == -999 {
+                    print("Balance request was cancelled, this is normal if multiple requests were made")
+                } else {
+                    print("Error fetching balance: \(error)")
+                    print("Error details: \(String(describing: error))")
+                    self.balance = "Error"
+                    self.monBalance = nil
+                }
+            }
         }
         
-        do {
-            print("Fetching balance for address: \(address)")
-            // Fetch native token balance
-            let url = URL(string: monadRPCURL)!
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            
-            // Get native token balance
-            let nativeBalanceJson: [String: Any] = [
-                "jsonrpc": "2.0",
-                "method": "eth_getBalance",
-                "params": [address, "latest"],
-                "id": 1
-            ]
-            
-            print("Sending request with JSON: \(nativeBalanceJson)")
-            request.httpBody = try JSONSerialization.data(withJSONObject: nativeBalanceJson)
-            let (data, _) = try await URLSession.shared.data(for: request)
-            let responseString = String(data: data, encoding: .utf8) ?? "Could not decode response"
-            print("Received response: \(responseString)")
-            
-            // First try to decode as error response
-            if let errorResponse = try? JSONDecoder().decode(JSONRPCErrorResponse.self, from: data) {
-                print("RPC Error: \(errorResponse.error.message)")
-                throw WalletError.rpcError(errorResponse.error.message)
-            }
-            
-            // If not an error, decode as success response
-            let response = try JSONDecoder().decode(JSONRPCResponse.self, from: data)
-            
-            // Convert hex balance to MON (since we're on Monad testnet)
-            let balanceHex = response.result
-            print("Raw balance hex: \(balanceHex)")
-            
-            // Remove "0x" prefix and convert to decimal using UInt64
-            let hexString = balanceHex.dropFirst(2)
-            let balance = Double(UInt64(hexString, radix: 16) ?? 0) / 1e18
-            print("Converted balance: \(balance) MON")
-            
-            // Update balance on main thread
-            self.balance = String(format: "%.4f MON", balance)
-            self.monBalance = nil // Clear MON balance since it's the same as native balance
-            
-            // Force UI update
-            await MainActor.run {
-                self.objectWillChange.send()
-            }
-        } catch {
-            print("Error fetching balance: \(error)")
-            print("Error details: \(String(describing: error))")
-            self.balance = "Error"
-            self.monBalance = nil
-        }
+        // Await the task completion if needed
+        await balanceRequestTask?.value
     }
     
     // Add a refresh function that can be called from the UI
