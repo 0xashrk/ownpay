@@ -78,10 +78,6 @@ Own Pay requires the following permissions:
 - Bluetooth: For discovering nearby payment requests and sending responses
 - Camera: For scanning QR codes of wallet addresses
 
-## License
-[Insert appropriate license information]
-
 ## Acknowledgements
 - Monad Blockchain team
 - Privy SDK for wallet infrastructure
-- All contributors to the project
