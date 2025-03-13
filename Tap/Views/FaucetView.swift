@@ -95,7 +95,7 @@ struct FaucetView: View {
                             privyService: privyService,
                             bleService: bleService,
                             settingsViewModel: SettingsViewModel.shared,
-                            playSound: { AudioServicesPlaySystemSound(1407) }
+                            playSound: { }
                         )
                         
                         // Clear the scanned address to remove the card after processing

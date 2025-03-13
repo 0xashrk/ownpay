@@ -341,9 +341,9 @@ struct PaymentRequestCard: View {
                             }
                             .transition(.scale.combined(with: .opacity))
                             .frame(height: 120)
-                            .onAppear {
-                                AudioServicesPlaySystemSound(1073) // Error sound
-                            }
+                            // .onAppear {
+                            //     AudioServicesPlaySystemSound(1073) // Comment out error sound
+                            // }
                         }
                     }
                 }

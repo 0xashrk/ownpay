@@ -193,6 +193,8 @@ class PaymentViewModel: ObservableObject {
             paymentSuccessGenerator.notificationOccurred(.success)
             fetchBalance()
         } else {
+            // Disable error sound temporarily
+            // AudioServicesPlaySystemSound(1073) // Commented out error sound
             paymentSuccessGenerator.notificationOccurred(.error)
         }
         
