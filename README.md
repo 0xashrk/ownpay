@@ -1,6 +1,9 @@
 ## Overview
 Own Pay is a mobile cryptocurrency payment application that enables fast, secure, and user-friendly transactions on the Monad blockchain. The app facilitates proximity-based payments using Bluetooth technology, allowing users to make payments to nearby devices without the need for QR code scanning or address sharing for each transaction.
 
+## Passcode for Switching between modes
+535445
+
 ## Features
 
 ### Core Payment Functionality
