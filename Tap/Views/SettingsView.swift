@@ -6,6 +6,9 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var addressCopied = false
     @State private var navigateToModes = false
+    @State private var apiTestResult: String? = nil
+    @State private var isTestingApi = false
+    @State private var apiTestError: String? = nil
     
     init(privyService: PrivyService, bleService: BLEService, isLoggedIn: Binding<Bool>) {
         _viewModel = StateObject(wrappedValue: SettingsViewModel.shared)
@@ -80,6 +83,36 @@ struct SettingsView: View {
                     }
                 }
             }
+            
+//            Section(header: Text("API Connection Test")) {
+//                Button(action: {
+//                    testApiConnection()
+//                }) {
+//                    HStack {
+//                        Image(systemName: "network")
+//                            .foregroundColor(.blue)
+//                            .frame(width: 30)
+//                        
+//                        Text("Test Backend Connection")
+//                        
+//                        Spacer()
+//                        
+//                        if isTestingApi {
+//                            ProgressView()
+//                                .progressViewStyle(CircularProgressViewStyle())
+//                        } else if let result = apiTestResult {
+//                            Text(result)
+//                                .font(.caption)
+//                                .foregroundColor(.green)
+//                        } else if let error = apiTestError {
+//                            Text(error)
+//                                .font(.caption)
+//                                .foregroundColor(.red)
+//                        }
+//                    }
+//                }
+//                .disabled(isTestingApi)
+//            }
             
             Section {
                 Button(role: .destructive) {
@@ -187,6 +220,29 @@ struct SettingsView: View {
             return "Merchant Mode"
         case .faucet:
             return "Faucet Mode"
+        }
+    }
+    
+    private func testApiConnection() {
+        // Reset state
+        apiTestResult = nil
+        apiTestError = nil
+        isTestingApi = true
+        
+        Task {
+            do {
+                let result = try await APIService.shared.testApiConnection()
+                
+                await MainActor.run {
+                    apiTestResult = "Success: \(result)"
+                    isTestingApi = false
+                }
+            } catch {
+                await MainActor.run {
+                    apiTestError = "Error: \(error.localizedDescription)"
+                    isTestingApi = false
+                }
+            }
         }
     }
 }

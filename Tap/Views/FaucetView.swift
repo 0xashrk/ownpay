@@ -157,18 +157,100 @@ struct QRScannerView: UIViewControllerRepresentable {
     class QRScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsDelegate {
         var completion: ((String) -> Void)?
         var captureSession: AVCaptureSession?
+        var previewLayer: AVCaptureVideoPreviewLayer?
+        var currentPosition: AVCaptureDevice.Position = .back
         
         override func viewDidLoad() {
             super.viewDidLoad()
             setupCamera()
+            setupFlipButton()
+        }
+        
+        func setupFlipButton() {
+            // Create flip camera button
+            let flipButton = UIButton(type: .system)
+            flipButton.setImage(UIImage(systemName: "camera.rotate"), for: .normal)
+            flipButton.tintColor = .white
+            flipButton.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+            flipButton.layer.cornerRadius = 25
+            flipButton.addTarget(self, action: #selector(flipCamera), for: .touchUpInside)
+            
+            // Add button to view
+            view.addSubview(flipButton)
+            flipButton.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                flipButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
+                flipButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -20),
+                flipButton.widthAnchor.constraint(equalToConstant: 50),
+                flipButton.heightAnchor.constraint(equalToConstant: 50)
+            ])
+        }
+        
+        @objc func flipCamera() {
+            // Toggle camera position
+            currentPosition = currentPosition == .back ? .front : .back
+            
+            // Stop current session
+            captureSession?.stopRunning()
+            
+            // Remove existing inputs
+            if let inputs = captureSession?.inputs {
+                for input in inputs {
+                    captureSession?.removeInput(input)
+                }
+            }
+            
+            // Setup with new camera
+            setupCameraInput()
+            
+            // Start session again
+            DispatchQueue.global(qos: .userInitiated).async {
+                self.captureSession?.startRunning()
+            }
         }
         
         func setupCamera() {
             let captureSession = AVCaptureSession()
             self.captureSession = captureSession
             
-            guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
-                print("Camera not available")
+            setupCameraInput()
+            
+            let metadataOutput = AVCaptureMetadataOutput()
+            if captureSession.canAddOutput(metadataOutput) {
+                captureSession.addOutput(metadataOutput)
+                
+                metadataOutput.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
+                metadataOutput.metadataObjectTypes = [.qr]
+            } else {
+                print("Could not add metadata output")
+                return
+            }
+            
+            // Add preview layer
+            let previewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
+            self.previewLayer = previewLayer
+            previewLayer.frame = view.layer.bounds
+            previewLayer.videoGravity = .resizeAspectFill
+            view.layer.addSublayer(previewLayer)
+            
+            // Start running
+            DispatchQueue.global(qos: .userInitiated).async {
+                self.captureSession?.startRunning()
+            }
+        }
+        
+        func setupCameraInput() {
+            guard let captureSession = captureSession else { return }
+            
+            // Get video capture device for the specified position
+            let discoverySession = AVCaptureDevice.DiscoverySession(
+                deviceTypes: [.builtInWideAngleCamera],
+                mediaType: .video,
+                position: currentPosition
+            )
+            
+            guard let videoCaptureDevice = discoverySession.devices.first else {
+                print("Camera not available for position: \(currentPosition)")
                 return
             }
             
@@ -178,33 +260,15 @@ struct QRScannerView: UIViewControllerRepresentable {
                     captureSession.addInput(videoInput)
                 } else {
                     print("Could not add video input")
-                    return
-                }
-                
-                let metadataOutput = AVCaptureMetadataOutput()
-                if captureSession.canAddOutput(metadataOutput) {
-                    captureSession.addOutput(metadataOutput)
-                    
-                    metadataOutput.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
-                    metadataOutput.metadataObjectTypes = [.qr]
-                } else {
-                    print("Could not add metadata output")
-                    return
-                }
-                
-                // Add preview layer
-                let previewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
-                previewLayer.frame = view.layer.bounds
-                previewLayer.videoGravity = .resizeAspectFill
-                view.layer.addSublayer(previewLayer)
-                
-                // Start running
-                DispatchQueue.global(qos: .userInitiated).async {
-                    self.captureSession?.startRunning()
                 }
             } catch {
                 print("Error setting up camera: \(error)")
             }
+        }
+        
+        override func viewDidLayoutSubviews() {
+            super.viewDidLayoutSubviews()
+            previewLayer?.frame = view.layer.bounds
         }
         
         func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {

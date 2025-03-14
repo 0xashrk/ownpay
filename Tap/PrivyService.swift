@@ -15,6 +15,9 @@ class PrivyService: ObservableObject {
     @Published var defaultRecipientAddress: String = "0x7C9976116d7d65cfE84580FEdBB2D96A0C6434C6"
     @Published var defaultAmount: Double = 2.0
     
+    // Add this property to store the token
+    @Published private(set) var accessToken: String?
+    
     static let shared = PrivyService()
     private var privy: Privy!
     private var ethereumProvider: EthereumEmbeddedWalletProvider?
@@ -52,42 +55,55 @@ class PrivyService: ObservableObject {
         // Set up auth state change callback
         privy.setAuthStateChangeCallback { [weak self] state in
             guard let self = self else { return }
-            print("Auth state changed to: \(String(describing: type(of: state)))")  // Don't print the actual state object with tokens
+            print("Auth state changed to: \(String(describing: type(of: state)))")
             
             DispatchQueue.main.async {
                 self.authState = state
-                if !self.isReady && state != .notReady {
-                    self.isReady = true
-                    print("PrivyService is now ready")
-                }
                 
-                // Get wallet address from auth session if available
+                // When authenticated, store the token
                 if case .authenticated(let session) = state {
-                    if let ethereumWallet = session.user.linkedAccounts.first(where: { account in
-                        if case .embeddedWallet(let wallet) = account {
-                            return wallet.chainType == .ethereum
-                        }
-                        return false
-                    }) {
-                        if case .embeddedWallet(let wallet) = ethereumWallet {
-                            self.walletAddress = wallet.address
-                            self.embeddedWalletState = .connected(wallets: [Wallet(address: wallet.address)])
-                            print("Found wallet from auth session: \(wallet.address)")
-                            
-                            // Instead of calling connectWallet, just get the provider directly here
-                            do {
-                                self.ethereumProvider = try self.privy.embeddedWallet.getEthereumProvider(for: wallet.address)
-                                print("Got ethereum provider for wallet")
+                    self.accessToken = session.authToken
+                    print("Access token received and stored: \(self.accessToken ?? "No token")")
+                    
+                    // Print the user's Privy ID
+                    print("User Privy ID: \(session.user.id)")
+                    
+                    if !self.isReady && state != .notReady {
+                        self.isReady = true
+                        print("PrivyService is now ready")
+                    }
+                    
+                    // Get wallet address from auth session if available
+                    if case .authenticated(let session) = state {
+                        if let ethereumWallet = session.user.linkedAccounts.first(where: { account in
+                            if case .embeddedWallet(let wallet) = account {
+                                return wallet.chainType == .ethereum
+                            }
+                            return false
+                        }) {
+                            if case .embeddedWallet(let wallet) = ethereumWallet {
+                                self.walletAddress = wallet.address
+                                self.embeddedWalletState = .connected(wallets: [Wallet(address: wallet.address)])
+                                print("Found wallet from auth session: \(wallet.address)")
                                 
-                                // Then fetch balance
-                                Task {
-                                    await self.fetchBalance()
+                                // Instead of calling connectWallet, just get the provider directly here
+                                do {
+                                    self.ethereumProvider = try self.privy.embeddedWallet.getEthereumProvider(for: wallet.address)
+                                    print("Got ethereum provider for wallet")
+                                    
+                                    // Then fetch balance
+                                    Task {
+                                        await self.fetchBalance()
+                                    }
+                                } catch {
+                                    print("Error getting provider: \(error)")
                                 }
-                            } catch {
-                                print("Error getting provider: \(error)")
                             }
                         }
                     }
+                } else {
+                    // Clear token if not authenticated
+                    self.accessToken = nil
                 }
             }
         }
@@ -469,5 +485,21 @@ class PrivyService: ObservableObject {
     // Add this helper function
     private func toHexString(_ number: UInt64) -> String {
         return "0x" + String(format: "%llx", number)
+    }
+    
+    // Add this convenient method to get the token
+    func getAccessToken() -> String? {
+        if case .authenticated(let session) = authState {
+            return session.authToken
+        }
+        return accessToken
+    }
+    
+    // Add this method to PrivyService class
+    func getUserId() -> String? {
+        if case .authenticated(let session) = authState {
+            return session.user.id
+        }
+        return nil
     }
 }
