@@ -105,9 +105,13 @@ struct LoginView: View {
             }
         }
         .onReceive(privyService.$authState) { state in
-            // print("Received auth state: \(state)")
             if case .authenticated = state {
                 isLoggedIn = true
+                
+                // Create wallet if needed after successful login
+                Task {
+                    await privyService.createEthereumWalletIfNeeded()
+                }
             }
         }
         .onReceive(privyService.$otpFlowState) { state in

@@ -76,29 +76,75 @@ class PrivyService: ObservableObject {
                     let userId = fullId.hasPrefix("did:privy:") ? String(fullId.dropFirst(10)) : fullId
                     print("User Privy ID: \(userId)")
                     
-                    // Get wallet address from auth session if available
-                    if let ethereumWallet = session.user.linkedAccounts.first(where: { account in
+                    // Check if user has a wallet
+                    let hasEthereumWallet = session.user.linkedAccounts.contains { account in
                         if case .embeddedWallet(let wallet) = account {
                             return wallet.chainType == .ethereum
                         }
                         return false
-                    }) {
-                        if case .embeddedWallet(let wallet) = ethereumWallet {
-                            self.walletAddress = wallet.address
-                            self.embeddedWalletState = .connected(wallets: [Wallet(address: wallet.address)])
-                            print("Found wallet from auth session: \(wallet.address)")
-                            
-                            // Instead of calling connectWallet, just get the provider directly here
-                            do {
-                                self.ethereumProvider = try self.privy.embeddedWallet.getEthereumProvider(for: wallet.address)
-                                print("Got ethereum provider for wallet")
+                    }
+                    
+                    if hasEthereumWallet {
+                        // User already has a wallet, retrieve it
+                        if let ethereumWallet = session.user.linkedAccounts.first(where: { account in
+                            if case .embeddedWallet(let wallet) = account {
+                                return wallet.chainType == .ethereum
+                            }
+                            return false
+                        }) {
+                            if case .embeddedWallet(let wallet) = ethereumWallet {
+                                self.walletAddress = wallet.address
+                                self.embeddedWalletState = .connected(wallets: [Wallet(address: wallet.address)])
+                                print("Found wallet from auth session: \(wallet.address)")
                                 
-                                // Then fetch balance
-                                Task {
-                                    await self.fetchBalance()
+                                // Get provider for this wallet
+                                do {
+                                    self.ethereumProvider = try self.privy.embeddedWallet.getEthereumProvider(for: wallet.address)
+                                    print("Got ethereum provider for wallet")
+                                    
+                                    // Fetch balance
+                                    Task {
+                                        await self.fetchBalance()
+                                    }
+                                } catch {
+                                    print("Error getting provider: \(error)")
+                                }
+                            }
+                        }
+                    } else {
+                        // User doesn't have a wallet, create one automatically
+                        print("User doesn't have an Ethereum wallet. Creating one automatically...")
+                        self.embeddedWalletState = .connecting
+                        
+                        // Create wallet in background task to avoid blocking the auth callback
+                        Task {
+                            do {
+                                // Create an Ethereum wallet based on the documentation
+                                let wallet = try await self.privy.embeddedWallet.createWallet(chainType: .ethereum, allowAdditional: false)
+                                
+                                await MainActor.run {
+                                    print("Wallet created successfully: \(wallet.address)")
+                                    self.walletAddress = wallet.address
+                                    self.embeddedWalletState = .connected(wallets: [Wallet(address: wallet.address)])
+                                    
+                                    // Get provider for the new wallet
+                                    do {
+                                        self.ethereumProvider = try self.privy.embeddedWallet.getEthereumProvider(for: wallet.address)
+                                        print("Got ethereum provider for newly created wallet")
+                                        
+                                        // Fetch balance for the new wallet
+                                        Task {
+                                            await self.fetchBalance()
+                                        }
+                                    } catch {
+                                        print("Error getting provider for new wallet: \(error)")
+                                    }
                                 }
                             } catch {
-                                print("Error getting provider: \(error)")
+                                await MainActor.run {
+                                    print("Error creating wallet: \(error)")
+                                    self.embeddedWalletState = .notConnected
+                                }
                             }
                         }
                     }
@@ -533,5 +579,47 @@ class PrivyService: ObservableObject {
             return fullId.hasPrefix("did:privy:") ? String(fullId.dropFirst(10)) : fullId
         }
         return nil
+    }
+    
+    // Add this method to explicitly create a wallet for the user
+    @MainActor
+    func createEthereumWalletIfNeeded() async {
+        print("Checking if user needs an Ethereum wallet...")
+        
+        if walletAddress != nil {
+            print("User already has a wallet, skipping creation")
+            return
+        }
+        
+        guard case .authenticated = authState else {
+            print("User not authenticated, cannot create wallet")
+            return
+        }
+        
+        print("No wallet found, creating new Ethereum wallet...")
+        self.embeddedWalletState = .connecting
+        
+        do {
+            // This is the correct API call according to Privy docs
+            let wallet = try await privy.embeddedWallet.createWallet(chainType: .ethereum, allowAdditional: false)
+            
+            print("✅ Wallet created successfully: \(wallet.address)")
+            self.walletAddress = wallet.address
+            self.embeddedWalletState = .connected(wallets: [Wallet(address: wallet.address)])
+            
+            // Get provider for the new wallet
+            do {
+                self.ethereumProvider = try self.privy.embeddedWallet.getEthereumProvider(for: wallet.address)
+                print("Got ethereum provider for newly created wallet")
+                
+                // Fetch balance for the new wallet
+                await self.fetchBalance()
+            } catch {
+                print("Error getting provider for new wallet: \(error)")
+            }
+        } catch {
+            print("Error creating wallet: \(error)")
+            self.embeddedWalletState = .notConnected
+        }
     }
 }
