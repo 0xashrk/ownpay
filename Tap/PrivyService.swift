@@ -65,8 +65,10 @@ class PrivyService: ObservableObject {
                     self.accessToken = session.authToken
                     print("Access token received and stored: \(self.accessToken ?? "No token")")
                     
-                    // Print the user's Privy ID
-                    print("User Privy ID: \(session.user.id)")
+                    // Extract and print the user's Privy ID without the "did:privy:" prefix
+                    let fullId = session.user.id
+                    let userId = fullId.hasPrefix("did:privy:") ? String(fullId.dropFirst(10)) : fullId
+                    print("User Privy ID: \(userId)")
                     
                     if !self.isReady && state != .notReady {
                         self.isReady = true
@@ -231,6 +233,9 @@ class PrivyService: ObservableObject {
         print("Logging out...")
         self.ethereumProvider = nil
         try await privy.logout()
+        
+        // Clear the user profile
+        UserProfileService.shared.clearProfile()
         
         self.authState = .unauthenticated
         self.otpFlowState = .initial
@@ -495,10 +500,11 @@ class PrivyService: ObservableObject {
         return accessToken
     }
     
-    // Add this method to PrivyService class
+    // Update this method to PrivyService class to return the ID without the prefix
     func getUserId() -> String? {
         if case .authenticated(let session) = authState {
-            return session.user.id
+            let fullId = session.user.id
+            return fullId.hasPrefix("did:privy:") ? String(fullId.dropFirst(10)) : fullId
         }
         return nil
     }

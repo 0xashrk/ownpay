@@ -9,6 +9,7 @@ struct SettingsView: View {
     @State private var apiTestResult: String? = nil
     @State private var isTestingApi = false
     @State private var apiTestError: String? = nil
+    @StateObject private var userProfileService = UserProfileService.shared
     
     init(privyService: PrivyService, bleService: BLEService, isLoggedIn: Binding<Bool>) {
         _viewModel = StateObject(wrappedValue: SettingsViewModel.shared)
@@ -17,7 +18,47 @@ struct SettingsView: View {
     
     var body: some View {
         List {
-            Section(header: Text("Wallet")) {
+            // Username row - completely standalone with no section
+            HStack {
+                // Username with neon effect
+                if let username = userProfileService.username {
+                    Text(username)
+                        .font(.system(size: 40, weight: .medium))
+                        .foregroundColor(Color(red: 0.3, green: 0.8, blue: 1.0))
+                        .shadow(color: Color(red: 0.3, green: 0.8, blue: 1.0).opacity(0.8), radius: 8, x: 0, y: 0)
+                } else if userProfileService.isLoadingProfile {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle())
+                } else {
+                    Text("Username")
+                        .font(.system(size: 40, weight: .medium))
+                        .foregroundColor(Color.gray)
+                }
+                
+                Spacer()
+                
+                // Pencil icon in circle - smaller version
+                Button(action: {
+                    Task {
+                        await userProfileService.fetchUserProfile()
+                    }
+                }) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 14))
+                        .foregroundColor(Color(red: 0.3, green: 0.8, blue: 1.0))
+                        .padding(8)
+                        .background(
+                            Circle()
+                                .stroke(Color(red: 0.3, green: 0.8, blue: 1.0), lineWidth: 1.0)
+                        )
+                }
+            }
+            .padding(.vertical, 25)
+            .padding(.horizontal, 5)
+            .listRowBackground(Color.black)
+            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+            
+            Section(header: Text("WALLET").foregroundColor(.gray).font(.caption)) {
                 Button(action: {
                     copyWalletAddress()
                 }) {
@@ -114,6 +155,13 @@ struct SettingsView: View {
 //                .disabled(isTestingApi)
 //            }
             
+            // Add spacing after the settings section
+            Divider()
+                .frame(height: 20)
+                .opacity(0)
+                .listRowBackground(Color.black)
+
+            // Logout section with improved visual separation but no gray background
             Section {
                 Button(role: .destructive) {
                     Task {
@@ -123,18 +171,36 @@ struct SettingsView: View {
                     }
                 } label: {
                     HStack {
-                        Label("Logout", systemImage: "rectangle.portrait.and.arrow.right")
+                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                            .foregroundColor(.red)
+                            .frame(width: 30)
+                        
+                        Text("Logout")
+                            .foregroundColor(.red)
+                            .fontWeight(.medium)
+                        
                         Spacer()
+                        
                         if viewModel.isLoggingOut {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .red))
                         }
                     }
+                    .padding(.vertical, 10)
                 }
                 .disabled(viewModel.isLoggingOut)
+                .listRowBackground(Color.black) // Black background to match the rest of the UI
             }
+            .listSectionSeparator(.hidden, edges: .top)
         }
         .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            // Fetch the user profile when the view appears
+            Task {
+                await userProfileService.fetchUserProfile()
+            }
+        }
         // Password prompt
         .alert("Enter Admin Password", isPresented: $viewModel.showingPasswordPrompt) {
             SecureField("Password", text: $viewModel.enteredPassword)
@@ -176,6 +242,14 @@ struct SettingsView: View {
             }
             .hidden()
         )
+        .listStyle(PlainListStyle())
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("Settings")
+                    .font(.headline)
+                    .foregroundColor(.white)
+            }
+        }
     }
     
     private func copyWalletAddress() {

@@ -56,6 +56,11 @@ struct ApiTestResponse: Decodable {
     let timestamp: String
 }
 
+struct UsernameResponse: Decodable {
+    let username: String
+    // Add any other profile fields your API returns
+}
+
 // MARK: - API Service
 class APIService {
     static let shared = APIService()
@@ -206,6 +211,10 @@ class APIService {
     func testApiConnectionMessage() async throws -> String {
         let response: ApiTestResponse = try await get(path: "/api-test", requiresAuth: true)
         return response.message
+    }
+    
+    func getUserProfile(userId: String) async throws -> UsernameResponse {
+        return try await get(path: "/profile/\(userId)", requiresAuth: true)
     }
     
     // Add more endpoint methods here based on your API needs

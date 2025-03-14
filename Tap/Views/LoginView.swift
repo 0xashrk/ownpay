@@ -105,7 +105,7 @@ struct LoginView: View {
             }
         }
         .onReceive(privyService.$authState) { state in
-            print("Received auth state: \(state)")
+            // print("Received auth state: \(state)")
             if case .authenticated = state {
                 isLoggedIn = true
             }
