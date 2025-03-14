@@ -4,12 +4,7 @@ struct SettingsView: View {
     @StateObject private var viewModel: SettingsViewModel
     @Binding var isLoggedIn: Bool
     @Environment(\.dismiss) private var dismiss
-    @State private var addressCopied = false
     @State private var navigateToModes = false
-    @State private var apiTestResult: String? = nil
-    @State private var isTestingApi = false
-    @State private var apiTestError: String? = nil
-    @StateObject private var userProfileService = UserProfileService.shared
     
     init(privyService: PrivyService, bleService: BLEService, isLoggedIn: Binding<Bool>) {
         _viewModel = StateObject(wrappedValue: SettingsViewModel.shared)
@@ -21,12 +16,12 @@ struct SettingsView: View {
             // Username row - completely standalone with no section
             HStack {
                 // Username with neon effect
-                if let username = userProfileService.username {
+                if let username = viewModel.userProfileService.username {
                     Text(username)
                         .font(.system(size: 40, weight: .medium))
                         .foregroundColor(Color(red: 0.3, green: 0.8, blue: 1.0))
                         .shadow(color: Color(red: 0.3, green: 0.8, blue: 1.0).opacity(0.8), radius: 8, x: 0, y: 0)
-                } else if userProfileService.isLoadingProfile {
+                } else if viewModel.userProfileService.isLoadingProfile {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle())
                 } else {
@@ -40,7 +35,7 @@ struct SettingsView: View {
                 // Pencil icon in circle - smaller version
                 Button(action: {
                     Task {
-                        await userProfileService.fetchUserProfile()
+                        await viewModel.refreshUserProfile()
                     }
                 }) {
                     Image(systemName: "pencil")
@@ -60,7 +55,7 @@ struct SettingsView: View {
             
             Section(header: Text("WALLET").foregroundColor(.gray).font(.caption)) {
                 Button(action: {
-                    copyWalletAddress()
+                    viewModel.copyWalletAddress()
                 }) {
                     HStack {
                         Spacer()
@@ -71,7 +66,7 @@ struct SettingsView: View {
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                             
-                            if addressCopied {
+                            if viewModel.addressCopied {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(.green)
                                     .font(.caption)
@@ -93,14 +88,14 @@ struct SettingsView: View {
                 }
             }
             
-            Section(header: Text("Settings")) {
+            Section(header: Text("SETTINGS").foregroundColor(.gray).font(.caption)) {
                 // Display current wallet mode
                 HStack {
-                    Image(systemName: iconForMode(viewModel.selectedMode))
+                    Image(systemName: viewModel.iconForMode(viewModel.selectedMode))
                         .foregroundColor(.blue)
                         .frame(width: 30)
                     
-                    Text("Current Mode: \(titleForMode(viewModel.selectedMode))")
+                    Text("Current Mode: \(viewModel.titleForMode(viewModel.selectedMode))")
                     
                     Spacer()
                 }
@@ -127,7 +122,7 @@ struct SettingsView: View {
             
 //            Section(header: Text("API Connection Test")) {
 //                Button(action: {
-//                    testApiConnection()
+//                    viewModel.testApiConnection()
 //                }) {
 //                    HStack {
 //                        Image(systemName: "network")
@@ -138,21 +133,21 @@ struct SettingsView: View {
 //                        
 //                        Spacer()
 //                        
-//                        if isTestingApi {
+//                        if viewModel.isTestingApi {
 //                            ProgressView()
 //                                .progressViewStyle(CircularProgressViewStyle())
-//                        } else if let result = apiTestResult {
+//                        } else if let result = viewModel.apiTestResult {
 //                            Text(result)
 //                                .font(.caption)
 //                                .foregroundColor(.green)
-//                        } else if let error = apiTestError {
+//                        } else if let error = viewModel.apiTestError {
 //                            Text(error)
 //                                .font(.caption)
 //                                .foregroundColor(.red)
 //                        }
 //                    }
 //                }
-//                .disabled(isTestingApi)
+//                .disabled(viewModel.isTestingApi)
 //            }
             
             // Add spacing after the settings section
@@ -161,7 +156,7 @@ struct SettingsView: View {
                 .opacity(0)
                 .listRowBackground(Color.black)
 
-            // Logout section with improved visual separation but no gray background
+            // Logout section with improved visual separation
             Section {
                 Button(role: .destructive) {
                     Task {
@@ -189,7 +184,7 @@ struct SettingsView: View {
                     .padding(.vertical, 10)
                 }
                 .disabled(viewModel.isLoggingOut)
-                .listRowBackground(Color.black) // Black background to match the rest of the UI
+                .listRowBackground(Color.black)
             }
             .listSectionSeparator(.hidden, edges: .top)
         }
@@ -198,7 +193,7 @@ struct SettingsView: View {
         .onAppear {
             // Fetch the user profile when the view appears
             Task {
-                await userProfileService.fetchUserProfile()
+                await viewModel.refreshUserProfile()
             }
         }
         // Password prompt
@@ -251,74 +246,6 @@ struct SettingsView: View {
             }
         }
     }
-    
-    private func copyWalletAddress() {
-        guard let address = viewModel.privyService.walletAddress else { return }
-        
-        #if os(iOS)
-        UIPasteboard.general.string = address
-        #elseif os(macOS)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(address, forType: .string)
-        #endif
-        
-        // Show copied indicator
-        withAnimation {
-            addressCopied = true
-        }
-        
-        // Reset copied status after 2 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation {
-                addressCopied = false
-            }
-        }
-    }
-    
-    private func iconForMode(_ mode: WalletMode) -> String {
-        switch mode {
-        case .customer:
-            return "person.fill"
-        case .merchant:
-            return "storefront.fill"
-        case .faucet:
-            return "drop.fill"
-        }
-    }
-    
-    private func titleForMode(_ mode: WalletMode) -> String {
-        switch mode {
-        case .customer:
-            return "Customer Mode"
-        case .merchant:
-            return "Merchant Mode"
-        case .faucet:
-            return "Faucet Mode"
-        }
-    }
-    
-    private func testApiConnection() {
-        // Reset state
-        apiTestResult = nil
-        apiTestError = nil
-        isTestingApi = true
-        
-        Task {
-            do {
-                let result = try await APIService.shared.testApiConnection()
-                
-                await MainActor.run {
-                    apiTestResult = "Success: \(result)"
-                    isTestingApi = false
-                }
-            } catch {
-                await MainActor.run {
-                    apiTestError = "Error: \(error.localizedDescription)"
-                    isTestingApi = false
-                }
-            }
-        }
-    }
 }
 
 // Wallet modes selection view
@@ -334,11 +261,11 @@ struct WalletModesView: View {
                     presentationMode.wrappedValue.dismiss()
                 }) {
                     HStack {
-                        Image(systemName: iconForMode(mode))
+                        Image(systemName: viewModel.iconForMode(mode))
                             .foregroundColor(.blue)
                             .frame(width: 30)
                         
-                        Text(titleForMode(mode))
+                        Text(viewModel.titleForMode(mode))
                         
                         Spacer()
                         
@@ -352,28 +279,6 @@ struct WalletModesView: View {
             }
         }
         .navigationTitle("Select Wallet Mode")
-    }
-    
-    private func iconForMode(_ mode: WalletMode) -> String {
-        switch mode {
-        case .customer:
-            return "person.fill"
-        case .merchant:
-            return "storefront.fill"
-        case .faucet:
-            return "drop.fill"
-        }
-    }
-    
-    private func titleForMode(_ mode: WalletMode) -> String {
-        switch mode {
-        case .customer:
-            return "Customer Mode"
-        case .merchant:
-            return "Merchant Mode"
-        case .faucet:
-            return "Faucet Mode"
-        }
     }
 }
 

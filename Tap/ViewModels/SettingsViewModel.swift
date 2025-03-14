@@ -51,8 +51,17 @@ class SettingsViewModel: ObservableObject {
     @Published var passwordError = false
     @Published var isPasswordVerified = false
     
+    // Wallet address copy state
+    @Published var addressCopied = false
+    
+    // API connection test properties
+    @Published var apiTestResult: String? = nil
+    @Published var isTestingApi = false
+    @Published var apiTestError: String? = nil
+    
     let privyService: PrivyService
     let bleService: BLEService
+    let userProfileService = UserProfileService.shared
     
     init(privyService: PrivyService, bleService: BLEService) {
         self.privyService = privyService
@@ -69,6 +78,84 @@ class SettingsViewModel: ObservableObject {
         // Ensure isMerchantMode is consistent with selectedMode on initialization
         self.isMerchantMode = self.selectedMode == .merchant
     }
+    
+    // MARK: - User Profile Functions
+    
+    func refreshUserProfile() async {
+        await userProfileService.fetchUserProfile()
+    }
+    
+    // MARK: - Wallet Address Functions
+    
+    func copyWalletAddress() {
+        guard let address = privyService.walletAddress else { return }
+        
+        #if os(iOS)
+        UIPasteboard.general.string = address
+        #elseif os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(address, forType: .string)
+        #endif
+        
+        // Show copied indicator
+        addressCopied = true
+        
+        // Reset copied status after 2 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            self.addressCopied = false
+        }
+    }
+    
+    // MARK: - Mode Helper Functions
+    
+    func iconForMode(_ mode: WalletMode) -> String {
+        switch mode {
+        case .customer:
+            return "person.fill"
+        case .merchant:
+            return "storefront.fill"
+        case .faucet:
+            return "drop.fill"
+        }
+    }
+    
+    func titleForMode(_ mode: WalletMode) -> String {
+        switch mode {
+        case .customer:
+            return "Customer Mode"
+        case .merchant:
+            return "Merchant Mode"
+        case .faucet:
+            return "Faucet Mode"
+        }
+    }
+    
+    // MARK: - API Connection Test
+    
+    func testApiConnection() {
+        // Reset state
+        apiTestResult = nil
+        apiTestError = nil
+        isTestingApi = true
+        
+        Task {
+            do {
+                let result = try await APIService.shared.testApiConnection()
+                
+                await MainActor.run {
+                    self.apiTestResult = "Success: \(result.message)"
+                    self.isTestingApi = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.apiTestError = "Error: \(error.localizedDescription)"
+                    self.isTestingApi = false
+                }
+            }
+        }
+    }
+    
+    // MARK: - Authentication Functions
     
     func logout() async {
         isLoggingOut = true
