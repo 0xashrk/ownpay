@@ -41,6 +41,7 @@ struct WalletView: View {
                 VStack(spacing: 20) {
                     // Wallet Address Section
                     BalanceView(isMerchantMode: $settingsViewModel.isMerchantMode)
+                        .padding(.bottom, 5)
                     
                     if settingsViewModel.selectedMode == .merchant {
                         MerchantView(
@@ -105,7 +106,7 @@ struct WalletView: View {
                             }
                     }
                 }
-                .padding()
+                .padding(.vertical)
             }
             .refreshable {
                 // Refresh balance when pulling down
