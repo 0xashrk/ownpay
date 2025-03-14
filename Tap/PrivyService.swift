@@ -60,6 +60,12 @@ class PrivyService: ObservableObject {
             DispatchQueue.main.async {
                 self.authState = state
                 
+                // CRITICAL FIX: Always update isReady after SDK initialization
+                if !self.isReady && state != .notReady {
+                    self.isReady = true
+                    print("PrivyService is now ready")
+                }
+                
                 // When authenticated, store the token
                 if case .authenticated(let session) = state {
                     self.accessToken = session.authToken
@@ -70,36 +76,29 @@ class PrivyService: ObservableObject {
                     let userId = fullId.hasPrefix("did:privy:") ? String(fullId.dropFirst(10)) : fullId
                     print("User Privy ID: \(userId)")
                     
-                    if !self.isReady && state != .notReady {
-                        self.isReady = true
-                        print("PrivyService is now ready")
-                    }
-                    
                     // Get wallet address from auth session if available
-                    if case .authenticated(let session) = state {
-                        if let ethereumWallet = session.user.linkedAccounts.first(where: { account in
-                            if case .embeddedWallet(let wallet) = account {
-                                return wallet.chainType == .ethereum
-                            }
-                            return false
-                        }) {
-                            if case .embeddedWallet(let wallet) = ethereumWallet {
-                                self.walletAddress = wallet.address
-                                self.embeddedWalletState = .connected(wallets: [Wallet(address: wallet.address)])
-                                print("Found wallet from auth session: \(wallet.address)")
+                    if let ethereumWallet = session.user.linkedAccounts.first(where: { account in
+                        if case .embeddedWallet(let wallet) = account {
+                            return wallet.chainType == .ethereum
+                        }
+                        return false
+                    }) {
+                        if case .embeddedWallet(let wallet) = ethereumWallet {
+                            self.walletAddress = wallet.address
+                            self.embeddedWalletState = .connected(wallets: [Wallet(address: wallet.address)])
+                            print("Found wallet from auth session: \(wallet.address)")
+                            
+                            // Instead of calling connectWallet, just get the provider directly here
+                            do {
+                                self.ethereumProvider = try self.privy.embeddedWallet.getEthereumProvider(for: wallet.address)
+                                print("Got ethereum provider for wallet")
                                 
-                                // Instead of calling connectWallet, just get the provider directly here
-                                do {
-                                    self.ethereumProvider = try self.privy.embeddedWallet.getEthereumProvider(for: wallet.address)
-                                    print("Got ethereum provider for wallet")
-                                    
-                                    // Then fetch balance
-                                    Task {
-                                        await self.fetchBalance()
-                                    }
-                                } catch {
-                                    print("Error getting provider: \(error)")
+                                // Then fetch balance
+                                Task {
+                                    await self.fetchBalance()
                                 }
+                            } catch {
+                                print("Error getting provider: \(error)")
                             }
                         }
                     }
