@@ -5,6 +5,7 @@ struct SettingsView: View {
     @Binding var isLoggedIn: Bool
     @Environment(\.dismiss) private var dismiss
     @State private var navigateToModes = false
+    @State private var showingUsernameEditor = false
     
     init(privyService: PrivyService, bleService: BLEService, isLoggedIn: Binding<Bool>) {
         _viewModel = StateObject(wrappedValue: SettingsViewModel.shared)
@@ -34,9 +35,7 @@ struct SettingsView: View {
                 
                 // Pencil icon in circle - smaller version
                 Button(action: {
-                    Task {
-                        await viewModel.refreshUserProfile()
-                    }
+                    showingUsernameEditor = true
                 }) {
                     Image(systemName: "pencil")
                         .font(.system(size: 14))
@@ -243,6 +242,13 @@ struct SettingsView: View {
                 Text("Settings")
                     .font(.headline)
                     .foregroundColor(.white)
+            }
+        }
+        .sheet(isPresented: $showingUsernameEditor) {
+            UsernameEditorSheet { newUsername in
+                Task {
+                    await viewModel.refreshUserProfile()
+                }
             }
         }
     }

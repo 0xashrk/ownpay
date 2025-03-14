@@ -61,6 +61,36 @@ struct UsernameResponse: Decodable {
     // Add any other profile fields your API returns
 }
 
+// Add these model structs
+struct ProfileUpdateRequest: Encodable {
+    let id: String
+    let username: String
+}
+
+struct ProfileUpdateResponse: Decodable {
+    let success: Bool
+    let data: UserProfileData
+    
+    // Add this to maintain compatibility with existing code
+    var username: String {
+        return data.username
+    }
+}
+
+struct UserProfileData: Decodable {
+    let id: String
+    let email: String
+    let twitter: String
+    let username: String
+    let solanaWallet: String
+    let ethereumWallet: String
+    let updatedAt: String
+}
+
+struct UsernameAvailabilityResponse: Decodable {
+    let taken: Bool
+}
+
 // MARK: - API Service
 class APIService {
     static let shared = APIService()
@@ -218,6 +248,35 @@ class APIService {
     }
     
     // Add more endpoint methods here based on your API needs
+    
+    // Add these methods to the APIService class
+    func checkUsernameAvailability(username: String) async throws -> UsernameAvailabilityResponse {
+        return try await get(path: "/profile/username/check/\(username)", requiresAuth: true)
+    }
+    
+    func updateProfile(username: String) async throws -> ProfileUpdateResponse {
+        // Get the user ID from PrivyService
+        guard let userId = PrivyService.shared.getUserId() else {
+            throw APIError.notAuthenticated
+        }
+        
+        // Create request with both id and username
+        let request = ProfileUpdateRequest(
+            id: userId, 
+            username: username
+        )
+        
+        // Log the request for debugging
+        print("Profile update request: \(userId), \(username)")
+        
+        // Make the API call
+        let response: ProfileUpdateResponse = try await post(path: "/profile/update", body: request, requiresAuth: true)
+        
+        // Log the response for debugging
+        print("Profile update response: \(response)")
+        
+        return response
+    }
 }
 
 // MARK: - Empty Response Types for endpoints with no return data

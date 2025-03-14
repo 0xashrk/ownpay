@@ -91,4 +91,19 @@ class UserProfileService: ObservableObject {
         profileError = nil
         lastFetchTimeStamp = 0
     }
+    
+    // Add this method to UserProfileService class
+    @MainActor
+    func updateUsername(_ newUsername: String) {
+        // Update the current username
+        self.username = newUsername
+        
+        // Cache it for offline fallback
+        self.storedUsername = newUsername
+        
+        // Update the last fetch timestamp to now
+        self.lastFetchTimeStamp = Date().timeIntervalSince1970
+        
+        print("Username updated locally: \(newUsername)")
+    }
 } 
