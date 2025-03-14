@@ -37,77 +37,83 @@ struct WalletView: View {
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Wallet Address Section
-                    BalanceView(isMerchantMode: $settingsViewModel.isMerchantMode)
-                        .padding(.bottom, 5)
-                    
-                    if settingsViewModel.selectedMode == .merchant {
-                        MerchantView(
-                            showingRequestForm: $showingRequestForm, 
-                            showingSendForm: $showingSendForm,
-                            selectionGenerator: selectionGenerator
-                        )
-                    } else if settingsViewModel.selectedMode == .faucet {
-                        FaucetView(
-                            isScanning: $isScanning, 
-                            showingSendForm: $showingSendForm,
-                            selectionGenerator: selectionGenerator,
-                            bleService: bleService
-                        )
-                    } else {
-                        CustomerView(
-                            isScanning: $isScanning, 
-                            showingSendForm: $showingSendForm,
-                            selectionGenerator: selectionGenerator,
-                            bleService: bleService
-                        )
-                    }
-                    
-                    // Payment Requests (visible to customer or faucet)
-                    if settingsViewModel.selectedMode != .merchant, 
-                       let message = bleService.receivedMessage, 
-                       !paymentViewModel.hasProcessedRequest(message) {
+            
+            VStack {
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Wallet Address Section
+                        BalanceView(isMerchantMode: $settingsViewModel.isMerchantMode)
+                            .padding(.bottom, 5)
                         
-                        PaymentRequestCard(
-                            message: message,
-                            bleService: bleService,
-                            settingsViewModel: settingsViewModel,
-                            onPaymentAction: { approved in
-                                _ = paymentViewModel.processPaymentRequest(
-                                    message: message,
-                                    approved: approved,
-                                    modelContext: modelContext,
-                                    privyService: privyService,
-                                    bleService: bleService,
-                                    settingsViewModel: settingsViewModel,
-                                    playSound: playPaymentSound
-                                )
-                            }
-                        )
-                        .padding(.horizontal)
-                    }
-                    
-                    // Payment Responses (visible to merchant)
-                    if settingsViewModel.selectedMode == .merchant, 
-                       let message = bleService.receivedMessage,
-                       message.starts(with: "PAYMENT_RESPONSE:") {
+                        if settingsViewModel.selectedMode == .merchant {
+                            MerchantView(
+                                showingRequestForm: $showingRequestForm,
+                                showingSendForm: $showingSendForm,
+                                selectionGenerator: selectionGenerator
+                            )
+                        } else if settingsViewModel.selectedMode == .faucet {
+                            FaucetView(
+                                isScanning: $isScanning,
+                                showingSendForm: $showingSendForm,
+                                selectionGenerator: selectionGenerator,
+                                bleService: bleService
+                            )
+                        } else {
+                            CustomerView(
+                                isScanning: $isScanning,
+                                showingSendForm: $showingSendForm,
+                                selectionGenerator: selectionGenerator,
+                                bleService: bleService
+                            )
+                        }
                         
-                        PaymentResponseCard(message: message)
+                        // Payment Requests (visible to customer or faucet)
+                        if settingsViewModel.selectedMode != .merchant,
+                           let message = bleService.receivedMessage,
+                           !paymentViewModel.hasProcessedRequest(message) {
+                            
+                            PaymentRequestCard(
+                                message: message,
+                                bleService: bleService,
+                                settingsViewModel: settingsViewModel,
+                                onPaymentAction: { approved in
+                                    _ = paymentViewModel.processPaymentRequest(
+                                        message: message,
+                                        approved: approved,
+                                        modelContext: modelContext,
+                                        privyService: privyService,
+                                        bleService: bleService,
+                                        settingsViewModel: settingsViewModel,
+                                        playSound: playPaymentSound
+                                    )
+                                }
+                            )
                             .padding(.horizontal)
-                            .onAppear {
-                                paymentViewModel.processPaymentResponse(
-                                    message: message,
-                                    bleService: bleService,
-                                    fetchBalance: { fetchBalanceWithRetry() },
-                                    playSound: playPaymentSound
-                                )
-                            }
+                        }
+                        
+                        // Payment Responses (visible to merchant)
+                        if settingsViewModel.selectedMode == .merchant,
+                           let message = bleService.receivedMessage,
+                           message.starts(with: "PAYMENT_RESPONSE:") {
+                            
+                            PaymentResponseCard(message: message)
+                                .padding(.horizontal)
+                                .onAppear {
+                                    paymentViewModel.processPaymentResponse(
+                                        message: message,
+                                        bleService: bleService,
+                                        fetchBalance: { fetchBalanceWithRetry() },
+                                        playSound: playPaymentSound
+                                    )
+                                }
+                        }
                     }
+                    .padding(.vertical)
                 }
-                .padding(.vertical)
+                Text("Created by own.fun")
+                    .foregroundStyle(Color.secondary)
             }
+//            Text("Hello")
             .refreshable {
                 // Refresh balance when pulling down
                 await privyService.fetchBalance()
@@ -118,7 +124,7 @@ struct WalletView: View {
                         .transition(.scale.combined(with: .opacity))
                 }
             }
-            .navigationTitle("Wallet")
+            .navigationTitle("Own Pay")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink {
