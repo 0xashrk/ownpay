@@ -79,11 +79,11 @@ struct ProfileUpdateResponse: Decodable {
 
 struct UserProfileData: Decodable {
     let id: String
-    let email: String
-    let twitter: String
+    let email: String?
+    let twitter: String?
     let username: String
-    let solanaWallet: String
-    let ethereumWallet: String
+    let solanaWallet: String?
+    let ethereumWallet: String?
     let updatedAt: String
 }
 

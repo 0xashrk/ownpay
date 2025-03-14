@@ -279,8 +279,17 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingUsernameEditor) {
             UsernameEditorSheet { newUsername in
+                // Immediately update the local username for instant UI feedback
+                localUsername = newUsername
+                
+                // Then refresh from backend to ensure everything is consistent
                 Task {
                     await viewModel.refreshUserProfile()
+                    
+                    // Make sure the UI state stays in sync with the refreshed data
+                    await MainActor.run {
+                        localUsername = viewModel.userProfileService.storedUsername
+                    }
                 }
             }
         }

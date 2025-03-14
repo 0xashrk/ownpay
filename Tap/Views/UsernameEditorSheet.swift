@@ -231,28 +231,44 @@ class UsernameEditorViewModel: ObservableObject {
         do {
             let response = try await APIService.shared.updateProfile(username: username)
             
+            // The request was successful
             await MainActor.run {
                 isUpdating = false
-                if !response.success {
-                    self.errorMessage = "Failed to update username"
-                } else {
+                
+                if response.success {
                     // Update local profile
                     UserProfileService.shared.updateUsername(response.username)
+                    print("Username successfully updated to: \(response.username)")
+                } else {
+                    self.errorMessage = "Failed to update username"
                 }
             }
             
             return response.success
         } catch let error as DecodingError {
-            await MainActor.run {
-                isUpdating = false
-                // More user-friendly error message
-                errorMessage = "The username was updated, but there was an issue displaying the result. Please check your profile."
-                print("Profile update parsing error: \(error)")
-            }
+            // Special handling for decoding errors - update might have succeeded
+            print("Decoding error: \(error)")
+            print("Username might have been updated, but there was an error parsing the response")
             
-            // Return true since the update likely succeeded
-            return true
+            // Check if username appears in the error's description
+            let errorDescription = error.localizedDescription
+            if errorDescription.contains(username) {
+                // If the username is in the error, it probably was set successfully
+                await MainActor.run {
+                    isUpdating = false
+                    UserProfileService.shared.updateUsername(username)
+                    errorMessage = "Your username was updated, but there was an issue with the server response."
+                }
+                return true
+            } else {
+                await MainActor.run {
+                    isUpdating = false
+                    errorMessage = "There was an issue updating your username. Please try again."
+                }
+                return false
+            }
         } catch {
+            // Other errors
             await MainActor.run {
                 isUpdating = false
                 errorMessage = "Error: \(error.localizedDescription)"
