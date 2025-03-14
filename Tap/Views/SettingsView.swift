@@ -57,7 +57,7 @@ struct SettingsView: View {
             }
             .padding(.vertical, 25)
             .padding(.horizontal, 5)
-            .listRowBackground(Color.black)
+//            .listRowBackground(Color.black)
             .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
             
             if let error = viewModel.userProfileService.profileError {
@@ -168,7 +168,7 @@ struct SettingsView: View {
             Divider()
                 .frame(height: 20)
                 .opacity(0)
-                .listRowBackground(Color.black)
+//                .listRowBackground(Color.black)
 
             // Logout section with improved visual separation
             Section {
@@ -198,7 +198,7 @@ struct SettingsView: View {
                     .padding(.vertical, 10)
                 }
                 .disabled(viewModel.isLoggingOut)
-                .listRowBackground(Color.black)
+//                .listRowBackground(Color.black)
             }
             .listSectionSeparator(.hidden, edges: .top)
         }
