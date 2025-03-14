@@ -52,7 +52,8 @@ class PrivyService: ObservableObject {
         // Set up auth state change callback
         privy.setAuthStateChangeCallback { [weak self] state in
             guard let self = self else { return }
-            print("Auth state changed to: \(state)")
+            print("Auth state changed to: \(String(describing: type(of: state)))")  // Don't print the actual state object with tokens
+            
             DispatchQueue.main.async {
                 self.authState = state
                 if !self.isReady && state != .notReady {
@@ -72,12 +73,20 @@ class PrivyService: ObservableObject {
                             self.walletAddress = wallet.address
                             self.embeddedWalletState = .connected(wallets: [Wallet(address: wallet.address)])
                             print("Found wallet from auth session: \(wallet.address)")
+                            
+                            // Instead of calling connectWallet, just get the provider directly here
+                            do {
+                                self.ethereumProvider = try self.privy.embeddedWallet.getEthereumProvider(for: wallet.address)
+                                print("Got ethereum provider for wallet")
+                                
+                                // Then fetch balance
+                                Task {
+                                    await self.fetchBalance()
+                                }
+                            } catch {
+                                print("Error getting provider: \(error)")
+                            }
                         }
-                    }
-                    
-                    // Still try to connect wallet in background
-                    Task {
-                        await self.connectWallet()
                     }
                 }
             }
