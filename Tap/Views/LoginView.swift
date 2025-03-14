@@ -44,13 +44,15 @@ struct LoginView: View {
                                 if isLoading {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
                                 } else {
                                     Text("Continue with Email")
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
                                 }
                             }
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
                             .background(Color.blue)
                             .cornerRadius(10)
                             .disabled(isLoading || email.isEmpty)
@@ -74,13 +76,15 @@ struct LoginView: View {
                                 if isLoading {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
                                 } else {
                                     Text("Verify")
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
                                 }
                             }
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
                             .background(Color.blue)
                             .cornerRadius(10)
                             .disabled(isLoading || otpCode.count != 6)
