@@ -6,6 +6,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var navigateToModes = false
     @State private var showingUsernameEditor = false
+    @State private var localUsername: String? = nil
     
     init(privyService: PrivyService, bleService: BLEService, isLoggedIn: Binding<Bool>) {
         _viewModel = StateObject(wrappedValue: SettingsViewModel.shared)
@@ -17,7 +18,7 @@ struct SettingsView: View {
             // Username row - completely standalone with no section
             HStack {
                 // Username with neon effect
-                if let username = viewModel.userProfileService.username {
+                if let username = localUsername {
                     Text(username)
                         .font(.system(size: 40, weight: .medium))
                         .foregroundColor(Color(red: 0.3, green: 0.8, blue: 1.0))
@@ -46,11 +47,25 @@ struct SettingsView: View {
                                 .stroke(Color(red: 0.3, green: 0.8, blue: 1.0), lineWidth: 1.0)
                         )
                 }
+                
+                if viewModel.userProfileService.isLoadingProfile {
+                    Text("Refreshing...")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .transition(.opacity)
+                }
             }
             .padding(.vertical, 25)
             .padding(.horizontal, 5)
             .listRowBackground(Color.black)
             .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+            
+            if let error = viewModel.userProfileService.profileError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundColor(.orange)
+                    .padding(.top, 4)
+            }
             
             Section(header: Text("WALLET").foregroundColor(.gray).font(.caption)) {
                 Button(action: {
@@ -187,12 +202,29 @@ struct SettingsView: View {
             }
             .listSectionSeparator(.hidden, edges: .top)
         }
+        .refreshable {
+            await viewModel.userProfileService.fetchUserProfile(silently: false, bypassRateLimit: true, forceRefresh: true)
+            
+            // This is the key step - explicitly update the local state
+            await MainActor.run {
+                print("UI Refresh: Old value: \(localUsername ?? "nil"), New value: \(viewModel.userProfileService.storedUsername ?? "nil")")
+                localUsername = viewModel.userProfileService.storedUsername
+            }
+        }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            // Fetch the user profile when the view appears
+            // Initialize with current value
+            localUsername = viewModel.userProfileService.storedUsername
+            
+            // Fetch user profile when view appears
             Task {
                 await viewModel.refreshUserProfile()
+                
+                // Force update of local state
+                await MainActor.run {
+                    localUsername = viewModel.userProfileService.storedUsername
+                }
             }
         }
         // Password prompt

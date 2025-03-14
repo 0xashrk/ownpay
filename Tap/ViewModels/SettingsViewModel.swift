@@ -81,8 +81,8 @@ class SettingsViewModel: ObservableObject {
     
     // MARK: - User Profile Functions
     
-    func refreshUserProfile() async {
-        await userProfileService.fetchUserProfile()
+    func refreshUserProfile(silently: Bool = true, forceRefresh: Bool = false) async {
+        await userProfileService.fetchUserProfile(silently: silently, bypassRateLimit: forceRefresh, forceRefresh: forceRefresh)
     }
     
     // MARK: - Wallet Address Functions
