@@ -45,15 +45,26 @@ struct PaymentRequestCard: View {
                         // Query SwiftData for all transactions
                         let allPayments = try modelContext.fetch(descriptor)
                         
+                        // Calculate cooldown period (12 hours ago)
+                        let cooldownPeriod: TimeInterval = 12 * 60 * 60 // 12 hours in seconds
+                        let cooldownCutoff = Date().addingTimeInterval(-cooldownPeriod)
+                        
                         // Filter transactions in memory to avoid predicate issues
+                        // ONLY COUNT TRANSACTIONS WITHIN THE LAST 12 HOURS
                         let matchingPayments = allPayments.filter { payment in
                             guard let paymentRecipient = payment.recipient else {
                                 return false
                             }
-                            return paymentRecipient == recipient && payment.isApproved == true
+                            
+                            // Only include transactions to this recipient that are:
+                            // 1. Within the last 12 hours
+                            // 2. Approved
+                            return paymentRecipient == recipient && 
+                                   payment.isApproved == true && 
+                                   payment.timestamp > cooldownCutoff
                         }
                         
-                        // Calculate total amount already sent
+                        // Calculate total amount already sent WITHIN THE COOLDOWN PERIOD
                         var totalSent = 0.0
                         var mostRecentDate: Date? = nil
                         
@@ -74,7 +85,6 @@ struct PaymentRequestCard: View {
                         
                         // Calculate time remaining for cooldown (12 hours from last transaction)
                         if let lastDate = mostRecentDate {
-                            let cooldownPeriod: TimeInterval = 12 * 60 * 60 // 12 hours in seconds
                             let now = Date()
                             let elapsedTime = now.timeIntervalSince(lastDate)
                             
@@ -87,10 +97,12 @@ struct PaymentRequestCard: View {
                             }
                         }
                         
-                        print("🚰 FAUCET MODE: Recipient \(recipient) has received \(totalSent) MON in total")
+                        print("🚰 FAUCET MODE: Recipient \(recipient) has received \(totalSent) MON in the last 12 hours")
                         print("🚰 FAUCET MODE: New request would exceed limit: \(exceedsFaucetLimit)")
                         if let remaining = timeRemainingForCooldown {
                             print("🚰 FAUCET MODE: Time remaining for cooldown: \(formatTimeRemaining(remaining))")
+                        } else if totalSent > 0 {
+                            print("🚰 FAUCET MODE: Cooldown period has passed, limit has reset")
                         }
                         
                     } catch {

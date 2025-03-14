@@ -53,15 +53,25 @@ class PaymentViewModel: ObservableObject {
             // Query SwiftData for all transactions
             let allPayments = try modelContext.fetch(descriptor)
             
-            // Filter in memory for relevant transactions
+            // Calculate cooldown period (12 hours ago)
+            let cooldownPeriod: TimeInterval = 12 * 60 * 60 // 12 hours in seconds
+            let cooldownCutoff = Date().addingTimeInterval(-cooldownPeriod)
+            
+            // Filter in memory for relevant transactions WITHIN THE LAST 12 HOURS
             let matchingPayments = allPayments.filter {
-                if let paymentRecipient = $0.recipient {
-                    return paymentRecipient == recipient && $0.isApproved == true
+                guard let paymentRecipient = $0.recipient else {
+                    return false
                 }
-                return false
+                // Only count payments that are:
+                // 1. To this recipient
+                // 2. Approved
+                // 3. Within the last 12 hours
+                return paymentRecipient == recipient && 
+                       $0.isApproved == true &&
+                       $0.timestamp > cooldownCutoff
             }
             
-            // Calculate total amount sent to this address
+            // Calculate total amount sent to this address WITHIN THE LAST 12 HOURS
             var totalSent = 0.0
             for payment in matchingPayments {
                 if let amountString = payment.amount, 
@@ -70,8 +80,8 @@ class PaymentViewModel: ObservableObject {
                 }
             }
             
-            print("🚰 FAUCET MODE: Recipient \(recipient) has received \(totalSent) MON in total")
-            print("🚰 FAUCET MODE: Recipient \(recipient) has \(matchingPayments.count) total transactions")
+            print("🚰 FAUCET MODE: Recipient \(recipient) has received \(totalSent) MON in the last 12 hours")
+            print("🚰 FAUCET MODE: Recipient \(recipient) has \(matchingPayments.count) transactions in the last 12 hours")
             
             // Check if the new request would exceed the limit (0.05 MON)
             if totalSent + requestedAmount > 0.05 {
@@ -111,14 +121,10 @@ class PaymentViewModel: ObservableObject {
         if settingsViewModel.selectedMode == .faucet && approved {
             let allowPayment = processFaucetPayment(message: message, modelContext: modelContext)
             if !allowPayment {
-                // Show alert for faucet limit
-                faucetAlertMessage = "Payment rejected: This wallet has already received more than 0.05 MON."
-                showingFaucetAlert = true
-                
-                // Mark as not approved - this will prevent actual payment
+                // Just reject the payment - no need for alert since PaymentRequestCard handles this
                 shouldReject = true
                 
-                // Log the rejection attempt (optional)
+                // Log the rejection attempt
                 print("⛔️ PAYMENT REJECTED: Faucet limit exceeded")
             }
         }
