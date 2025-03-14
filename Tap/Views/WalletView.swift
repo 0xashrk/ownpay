@@ -112,6 +112,7 @@ struct WalletView: View {
                 }
                 Text("Created by own.fun")
                     .foregroundStyle(Color.secondary)
+                    .font(.caption)
             }
 //            Text("Hello")
             .refreshable {
