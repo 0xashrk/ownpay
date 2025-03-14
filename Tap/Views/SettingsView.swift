@@ -16,49 +16,52 @@ struct SettingsView: View {
     var body: some View {
         List {
             // Username row - completely standalone with no section
-            HStack {
-                // Username with neon effect
+            VStack(spacing: 16) {
+                // Centered username with neon effect
                 if let username = localUsername {
                     Text(username)
                         .font(.system(size: 40, weight: .medium))
                         .foregroundColor(Color(red: 0.3, green: 0.8, blue: 1.0))
                         .shadow(color: Color(red: 0.3, green: 0.8, blue: 1.0).opacity(0.8), radius: 8, x: 0, y: 0)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
                 } else if viewModel.userProfileService.isLoadingProfile {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle())
+                        .frame(maxWidth: .infinity)
                 } else {
                     Text("Username")
                         .font(.system(size: 40, weight: .medium))
                         .foregroundColor(Color.gray)
+                        .frame(maxWidth: .infinity)
                 }
                 
-                Spacer()
-                
-                // Pencil icon in circle - smaller version
+                // Edit Profile button - cyberpunk style
                 Button(action: {
                     showingUsernameEditor = true
                 }) {
-                    Image(systemName: "pencil")
-                        .font(.system(size: 14))
-                        .foregroundColor(Color(red: 0.3, green: 0.8, blue: 1.0))
-                        .padding(8)
-                        .background(
-                            Circle()
-                                .stroke(Color(red: 0.3, green: 0.8, blue: 1.0), lineWidth: 1.0)
-                        )
+                    HStack(spacing: 10) {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 16))
+                        
+                        Text("Edit Profile")
+                            .font(.system(size: 18, weight: .medium))
+                    }
+                    .foregroundColor(Color(red: 0.3, green: 0.8, blue: 1.0))
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 20)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color(red: 0.3, green: 0.8, blue: 1.0), lineWidth: 0.3)
+                    )
                 }
-                
-                if viewModel.userProfileService.isLoadingProfile {
-                    Text("Refreshing...")
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                        .transition(.opacity)
-                }
+                .padding(.top, 8)
+                .disabled(viewModel.userProfileService.isLoadingProfile)
             }
             .padding(.vertical, 25)
-            .padding(.horizontal, 5)
-//            .listRowBackground(Color.black)
-            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
             
             if let error = viewModel.userProfileService.profileError {
                 Text(error)
@@ -168,7 +171,6 @@ struct SettingsView: View {
             Divider()
                 .frame(height: 20)
                 .opacity(0)
-//                .listRowBackground(Color.black)
 
             // Logout section with improved visual separation
             Section {
@@ -198,7 +200,6 @@ struct SettingsView: View {
                     .padding(.vertical, 10)
                 }
                 .disabled(viewModel.isLoggingOut)
-//                .listRowBackground(Color.black)
             }
             .listSectionSeparator(.hidden, edges: .top)
         }
