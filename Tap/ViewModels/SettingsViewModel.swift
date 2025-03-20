@@ -72,7 +72,7 @@ class SettingsViewModel: ObservableObject {
            let savedMode = WalletMode(rawValue: savedModeString) {
             self.selectedMode = savedMode
         } else {
-            self.selectedMode = .customer
+            self.selectedMode = .merchant
         }
         
         // Ensure isMerchantMode is consistent with selectedMode on initialization

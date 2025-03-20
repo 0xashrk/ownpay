@@ -125,7 +125,8 @@ struct WalletView: View {
                         .transition(.scale.combined(with: .opacity))
                 }
             }
-            .navigationTitle("Own Pay")
+            .navigationTitle(settingsViewModel.selectedMode == .faucet ? "Faucet" : "Wallet")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink {
