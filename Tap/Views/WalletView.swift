@@ -49,7 +49,9 @@ struct WalletView: View {
                             MerchantView(
                                 showingRequestForm: $showingRequestForm,
                                 showingSendForm: $showingSendForm,
-                                selectionGenerator: selectionGenerator
+                                selectionGenerator: selectionGenerator,
+                                isScanning: $isScanning,
+                                bleService: bleService
                             )
                         } else if settingsViewModel.selectedMode == .faucet {
                             FaucetView(
