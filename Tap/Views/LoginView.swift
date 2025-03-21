@@ -9,11 +9,26 @@ struct LoginView: View {
     @State private var errorMessage: String?
     @State private var isLoading = false
     @State private var isLoggedIn = false
+    @Environment(\.colorScheme) var colorScheme
+    
+    // Theme colors
+    private var accentColor: Color { Color.blue }
+    private var errorColor: Color { Color.red }
+    private var backgroundColor: Color { colorScheme == .dark ? Color.black.opacity(0.6) : Color.white }
+    private var secondaryBgColor: Color { colorScheme == .dark ? Color.black.opacity(0.3) : Color.gray.opacity(0.1) }
     
     var body: some View {
         Group {
             if !privyService.isReady {
-                ProgressView("Initializing...")
+                ZStack {
+                    backgroundColor.ignoresSafeArea()
+                    VStack {
+                        ProgressView("Initializing...")
+                            .padding()
+                            .background(secondaryBgColor)
+                            .cornerRadius(10)
+                    }
+                }
             } else if isLoggedIn {
                 ContentView()
                     .onDisappear {
@@ -25,87 +40,178 @@ struct LoginView: View {
                         errorMessage = nil
                     }
             } else {
-                VStack(spacing: 20) {
-                    Text("Welcome to Tap")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                    
-                    if !showingOTPInput {
-                        // Email Input View
-                        VStack(spacing: 16) {
-                            TextField("Email", text: $email)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .textCase(.lowercase)
-                                .keyboardType(.emailAddress)
-                                .autocapitalization(.none)
-                                .disabled(isLoading)
+                GeometryReader { geometry in
+                    ZStack {
+                        backgroundColor.ignoresSafeArea()
+                        
+                        ScrollView(showsIndicators: false) {
+                            // This spacer helps center the content
+                            Spacer(minLength: max(0, (geometry.size.height - 600) / 2))
+                                .frame(height: max(0, (geometry.size.height - 600) / 2))
                             
-                            Button(action: sendOTP) {
-                                if isLoading {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        .frame(maxWidth: .infinity)
-                                        .padding()
-                                } else {
-                                    Text("Continue with Email")
-                                        .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity)
-                                        .padding()
+                            VStack(spacing: 32) {
+                                // Logo/Brand section
+                                VStack(spacing: 16) {
+                                    Image(systemName: "creditcard.fill")
+                                        .font(.system(size: 60))
+                                        .foregroundColor(accentColor)
+                                    
+                                    Text("Welcome to Own Pay")
+                                        .font(.system(size: 28, weight: .bold))
+                                        .multilineTextAlignment(.center)
+                                    
+                                    Text("Contactless MON payments")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                        .multilineTextAlignment(.center)
                                 }
-                            }
-                            .background(Color.blue)
-                            .cornerRadius(10)
-                            .disabled(isLoading || email.isEmpty)
-                        }
-                    } else {
-                        // OTP Input View
-                        VStack(spacing: 16) {
-                            Text("Enter verification code")
-                                .font(.headline)
-                            
-                            Text("We sent a code to \(email)")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            
-                            TextField("Code", text: $otpCode)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .keyboardType(.numberPad)
-                                .disabled(isLoading)
-                            
-                            Button(action: verifyOTP) {
-                                if isLoading {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        .frame(maxWidth: .infinity)
-                                        .padding()
-                                } else {
-                                    Text("Verify")
+                                
+                                if !showingOTPInput {
+                                    // Login Card
+                                    VStack(spacing: 24) {
+                                        // Email Input
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            Text("Email")
+                                                .font(.headline)
+                                                .foregroundColor(.primary)
+                                            
+                                            HStack {
+                                                Image(systemName: "envelope")
+                                                    .foregroundColor(.secondary)
+                                                
+                                                TextField("Enter your email", text: $email)
+                                                    .textCase(.lowercase)
+                                                    .keyboardType(.emailAddress)
+                                                    .autocapitalization(.none)
+                                                    .disabled(isLoading)
+                                                    .padding(12)
+                                                    .background(secondaryBgColor)
+                                                    .cornerRadius(8)
+                                            }
+                                        }
+                                        
+                                        // Continue Button
+                                        Button(action: sendOTP) {
+                                            if isLoading {
+                                                HStack {
+                                                    Spacer()
+                                                    ProgressView()
+                                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                                    Spacer()
+                                                }
+                                                .padding()
+                                            } else {
+                                                HStack {
+                                                    Spacer()
+                                                    Text("Continue with Email")
+                                                        .fontWeight(.semibold)
+                                                    Spacer()
+                                                }
+                                                .padding()
+                                            }
+                                        }
+                                        .background(email.isEmpty ? accentColor.opacity(0.3) : accentColor)
                                         .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity)
-                                        .padding()
+                                        .cornerRadius(12)
+                                        .disabled(isLoading || email.isEmpty)
+                                    }
+                                    .padding(.horizontal, 20)
+                                } else {
+                                    // OTP Verification Card
+                                    VStack(spacing: 24) {
+                                        // Header
+                                        VStack(spacing: 8) {
+                                            Text("Verification Code")
+                                                .font(.headline)
+                                                .foregroundColor(.primary)
+                                            
+                                            Text("We sent a code to \(email)")
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                                .multilineTextAlignment(.center)
+                                        }
+                                        
+                                        // OTP Input
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            Text("Enter Code")
+                                                .font(.headline)
+                                                .foregroundColor(.primary)
+                                            
+                                            HStack {
+                                                Image(systemName: "lock.shield")
+                                                    .foregroundColor(.secondary)
+                                                
+                                                TextField("6-digit code", text: $otpCode)
+                                                    .keyboardType(.numberPad)
+                                                    .disabled(isLoading)
+                                                    .padding(12)
+                                                    .background(secondaryBgColor)
+                                                    .cornerRadius(8)
+                                            }
+                                        }
+                                        
+                                        // Verify Button
+                                        Button(action: verifyOTP) {
+                                            if isLoading {
+                                                HStack {
+                                                    Spacer()
+                                                    ProgressView()
+                                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                                    Spacer()
+                                                }
+                                                .padding()
+                                            } else {
+                                                HStack {
+                                                    Spacer()
+                                                    Text("Verify")
+                                                        .fontWeight(.semibold)
+                                                    Spacer()
+                                                }
+                                                .padding()
+                                            }
+                                        }
+                                        .background(otpCode.count != 6 ? accentColor.opacity(0.3) : accentColor)
+                                        .foregroundColor(.white)
+                                        .cornerRadius(12)
+                                        .disabled(isLoading || otpCode.count != 6)
+                                        
+                                        // Resend Button
+                                        Button(action: sendOTP) {
+                                            Text("Resend Code")
+                                                .foregroundColor(accentColor)
+                                        }
+                                        .disabled(isLoading)
+                                        .padding(.top, 8)
+                                    }
+                                    .padding(.horizontal, 20)
                                 }
+                                
+                                // Error Message
+                                if let error = errorMessage {
+                                    HStack {
+                                        Image(systemName: "exclamationmark.triangle")
+                                            .foregroundColor(errorColor)
+                                        Text(error)
+                                            .font(.caption)
+                                            .foregroundColor(errorColor)
+                                            .multilineTextAlignment(.center)
+                                    }
+                                    .padding()
+                                    .background(errorColor.opacity(0.1))
+                                    .cornerRadius(8)
+                                    .padding(.horizontal, 20)
+                                }
+                                
+                                // This spacer helps center the content from the bottom
+                                Spacer(minLength: max(0, (geometry.size.height - 600) / 2))
+                                    .frame(height: max(0, (geometry.size.height - 600) / 2))
                             }
-                            .background(Color.blue)
-                            .cornerRadius(10)
-                            .disabled(isLoading || otpCode.count != 6)
-                            
-                            Button(action: sendOTP) {
-                                Text("Resend Code")
-                                    .foregroundColor(.blue)
-                            }
-                            .disabled(isLoading)
+                            .frame(minHeight: geometry.size.height)
+                            .padding(.top, 20)
+                            .padding(.bottom, 20)
                         }
-                    }
-                    
-                    if let error = errorMessage {
-                        Text(error)
-                            .foregroundColor(.red)
-                            .font(.caption)
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: .infinity)
                     }
                 }
-                .padding()
             }
         }
         .onReceive(privyService.$authState) { state in
