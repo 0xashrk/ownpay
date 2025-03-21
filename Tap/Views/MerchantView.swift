@@ -6,17 +6,21 @@
 //
 
 import SwiftUI
+import Combine
 
 struct MerchantView: View {
     @Binding var showingRequestForm: Bool
     @Binding var showingSendForm: Bool
-    
-    // New parameters with default values
     @Binding var isScanning: Bool
-    let selectionGenerator: UISelectionFeedbackGenerator
-    let bleService: BLEService?  // Made optional
     
-    // Initialize with default values for backward compatibility
+    let selectionGenerator: UISelectionFeedbackGenerator
+    let bleService: BLEService?
+    
+    // View Model for better separation of concerns
+    @StateObject private var viewModel = MerchantViewModel()
+    @Environment(\.colorScheme) var colorScheme
+    
+    // Initialize with existing parameters to avoid breaking changes
     init(showingRequestForm: Binding<Bool>, 
          showingSendForm: Binding<Bool>,
          selectionGenerator: UISelectionFeedbackGenerator,
@@ -29,85 +33,507 @@ struct MerchantView: View {
         self.bleService = bleService
     }
     
+    // Theme properties
+    private var primaryColor: Color { Color.blue }
+    private var secondaryColor: Color { Color.purple }
+    private var surfaceColor: Color { colorScheme == .dark ? Color.black.opacity(0.3) : Color.gray.opacity(0.1) }
+    
     var body: some View {
-        VStack(spacing: 16) {
-            // Only show discovery UI if bleService is provided
-            if let bleService = bleService {
-                HStack {
-                    Text(isScanning ? "Discovering..." : "Ready to detect requests")
-                        .foregroundColor(.secondary)
-                    
-                    Button(action: {
-                        selectionGenerator.selectionChanged()
-                        withAnimation {
-                            isScanning = true
-                        }
-                        // Restart scanning
-                        bleService.stopScanning()
-                        bleService.startScanning()
-                        
-                        // Reset scanning indicator after 2 seconds
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                            withAnimation {
-                                isScanning = false
-                            }
-                        }
-                    }) {
-                        HStack(spacing: 2) {
-                            Image(systemName: "wave.3.right")
-                                .font(.system(size: 18))
-                            Text("Discover")
-                                .font(.subheadline)
-                        }
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 10)
-                        .background(Color.blue.opacity(0.1))
-                        .foregroundColor(.blue)
-                        .cornerRadius(8)
-                    }
+        ScrollView {
+            VStack(spacing: 20) {
+                // BLE Discovery section
+                if let bleService = bleService {
+                    discoverySection(bleService: bleService)
                 }
-                .padding(.top)
-                .padding(.horizontal)
-            }
-            
-            // Request Payment button
-            Button(action: {
-                selectionGenerator.selectionChanged()
-                showingRequestForm = true
-            }) {
-                HStack {
-                    Image(systemName: "dollarsign.circle.fill")
-                        .font(.system(size: 24))
-                    Text("Request Payment")
-                        .font(.headline)
-                }
-                .foregroundColor(.blue)
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.blue.opacity(0.1))
-                .cornerRadius(15)
+                
+                // Main action cards
+                actionCardsSection
+                
+                // Recent requests
+                recentRequestsSection
             }
             .padding(.horizontal)
+        }
+        .sheet(isPresented: $viewModel.showingFriendPicker) {
+            NavigationView {
+                FriendPickerView(
+                    selectedFriend: $viewModel.selectedFriend,
+                    isPresented: $viewModel.showingFriendPicker,
+                    onSendRequest: { friend in
+                        viewModel.selectedFriend = friend
+                        viewModel.showingFriendPicker = false
+                        showingRequestForm = true
+                    }
+                )
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .onChange(of: viewModel.selectedFriend) { newValue in
+            // Could trigger additional actions when friend is selected
+        }
+        .onAppear {
+            viewModel.loadFriends()
+        }
+    }
+    
+    // MARK: - UI Components
+    
+    private func discoverySection(bleService: BLEService) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(isScanning ? "Discovering..." : "Ready to detect requests")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                
+                if isScanning {
+                    ProgressView()
+                        .progressViewStyle(LinearProgressViewStyle())
+                        .frame(width: 100)
+                }
+            }
             
-            // Send MON button (added to match customer mode)
+            Spacer()
+            
+            Button(action: {
+                selectionGenerator.selectionChanged()
+                withAnimation {
+                    isScanning = true
+                }
+                bleService.stopScanning()
+                bleService.startScanning()
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    withAnimation {
+                        isScanning = false
+                    }
+                }
+            }) {
+                Label("Discover", systemImage: "wave.3.right")
+                    .font(.system(size: 14, weight: .medium))
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .background(primaryColor.opacity(0.1))
+                    .foregroundColor(primaryColor)
+                    .cornerRadius(8)
+            }
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .background(surfaceColor)
+        .cornerRadius(12)
+    }
+    
+    private var actionCardsSection: some View {
+        VStack(spacing: 16) {
+            Text("Request or Send")
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            HStack(spacing: 12) {
+                // Nearby Request Card
+                actionCard(
+                    title: "Request Nearby",
+                    subtitle: "Use contactless",
+                    icon: "arrow.down.circle.fill",
+                    color: primaryColor,
+                    action: {
+                        selectionGenerator.selectionChanged()
+                        showingRequestForm = true
+                    }
+                )
+                
+                // Request from Friend Card
+                actionCard(
+                    title: "Request from Friend",
+                    subtitle: "Select a user",
+                    icon: "person.fill.badge.plus",
+                    color: secondaryColor,
+                    action: {
+                        selectionGenerator.selectionChanged()
+                        viewModel.showingFriendPicker = true
+                    }
+                )
+            }
+            
+            // Send Money Card
             Button(action: {
                 selectionGenerator.selectionChanged()
                 showingSendForm = true
             }) {
                 HStack {
-                    Image(systemName: "paperplane.fill")
-                        .font(.system(size: 24))
-                    Text("Send MON")
-                        .font(.headline)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Send MON")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        Text("Transfer to any wallet")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "paperplane.circle.fill")
+                        .font(.system(size: 30))
+                        .foregroundColor(primaryColor)
                 }
-                .foregroundColor(.blue)
-                .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color.blue.opacity(0.1))
-                .cornerRadius(15)
+                .background(surfaceColor)
+                .cornerRadius(12)
             }
-            .padding(.horizontal)
+            .buttonStyle(PlainButtonStyle())
         }
+    }
+    
+    private func actionCard(title: String, subtitle: String, icon: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 24))
+                    .foregroundColor(color)
+                
+                Spacer()
+                
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .frame(height: 120)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(surfaceColor)
+            .cornerRadius(12)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private var recentRequestsSection: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Text("Recent Requests")
+                    .font(.headline)
+                
+                Spacer()
+                
+                Button(action: {
+                    // Show all requests
+                }) {
+                    Text("View All")
+                        .font(.subheadline)
+                        .foregroundColor(primaryColor)
+                }
+            }
+            
+            if viewModel.recentRequests.isEmpty {
+                emptyRequestsView
+            } else {
+                ForEach(viewModel.recentRequests) { request in
+                    requestRow(request: request)
+                }
+            }
+        }
+        .padding(.top)
+    }
+    
+    private var emptyRequestsView: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "tray")
+                .font(.system(size: 40))
+                .foregroundColor(.secondary.opacity(0.5))
+                .padding()
+            
+            Text("No recent requests")
+                .font(.headline)
+                .foregroundColor(.secondary)
+            
+            Text("Your recent payment requests will appear here")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 30)
+        .background(surfaceColor)
+        .cornerRadius(12)
+    }
+    
+    private func requestRow(request: PaymentRequest) -> some View {
+        HStack(spacing: 12) {
+            // Avatar/Icon
+            Image(systemName: request.type == .user ? "person.crop.circle.fill" : "wave.3.right.circle.fill")
+                .font(.system(size: 36))
+                .foregroundColor(request.type == .user ? secondaryColor : primaryColor)
+            
+            // Details
+            VStack(alignment: .leading, spacing: 4) {
+                Text(request.title)
+                    .font(.headline)
+                
+                Text(request.description)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Text(request.timeAgo)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            // Amount
+            Text(request.amount)
+                .font(.headline)
+                .foregroundColor(.primary)
+        }
+        .padding()
+        .background(surfaceColor)
+        .cornerRadius(12)
+    }
+}
+
+// MARK: - Supporting Views
+
+struct FriendPickerView: View {
+    @Binding var selectedFriend: Friend?
+    @Binding var isPresented: Bool
+    @State private var searchText = ""
+    let onSendRequest: (Friend) -> Void
+    
+    @StateObject private var viewModel = FriendsViewModel()
+    @Environment(\.colorScheme) var colorScheme
+    
+    private var surfaceColor: Color { colorScheme == .dark ? Color.black.opacity(0.3) : Color.gray.opacity(0.1) }
+    
+    var filteredFriends: [Friend] {
+        if searchText.isEmpty {
+            return viewModel.friends
+        } else {
+            return viewModel.friends.filter {
+                $0.name.lowercased().contains(searchText.lowercased()) ||
+                $0.username.lowercased().contains(searchText.lowercased())
+            }
+        }
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Search bar
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.secondary)
+                
+                TextField("Search friends", text: $searchText)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+                
+                if !searchText.isEmpty {
+                    Button(action: { searchText = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .padding()
+            .background(surfaceColor)
+            .cornerRadius(10)
+            .padding()
+            
+            if filteredFriends.isEmpty {
+                emptyFriendsView
+            } else {
+                // Friends list
+                List {
+                    ForEach(filteredFriends) { friend in
+                        friendRow(friend: friend)
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                            .listRowBackground(Color.clear)
+                    }
+                }
+                .listStyle(PlainListStyle())
+            }
+        }
+        .navigationTitle("Select Friend")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Cancel") {
+                    isPresented = false
+                }
+            }
+        }
+        .onAppear {
+            viewModel.loadFriends()
+        }
+    }
+    
+    private var emptyFriendsView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "person.3")
+                .font(.system(size: 50))
+                .foregroundColor(.secondary.opacity(0.5))
+                .padding()
+            
+            if searchText.isEmpty {
+                Text("No friends yet")
+                    .font(.headline)
+                
+                Text("You haven't added any friends to request from")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                
+                Button(action: {
+                    // Action to add friends
+                }) {
+                    Label("Add Friends", systemImage: "person.badge.plus")
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                }
+                .padding(.top, 8)
+            } else {
+                Text("No matches found")
+                    .font(.headline)
+                
+                Text("Try a different search term")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    
+    private func friendRow(friend: Friend) -> some View {
+        Button(action: {
+            selectedFriend = friend
+            onSendRequest(friend)
+        }) {
+            HStack(spacing: 16) {
+                // Avatar image
+                ZStack {
+                    Circle()
+                        .fill(Color.purple.opacity(0.2))
+                        .frame(width: 50, height: 50)
+                    
+                    Image(systemName: friend.avatarName)
+                        .font(.system(size: 24))
+                        .foregroundColor(.purple)
+                }
+                
+                // Friend info
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(friend.name)
+                        .font(.headline)
+                    
+                    Text(friend.username)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                // Direct request button
+                Button(action: {
+                    selectedFriend = friend
+                    onSendRequest(friend)
+                }) {
+                    Text("Request")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.purple)
+                        .foregroundColor(.white)
+                        .cornerRadius(16)
+                }
+            }
+            .padding(.vertical, 8)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - View Models
+
+class MerchantViewModel: ObservableObject {
+    @Published var selectedFriend: Friend?
+    @Published var showingFriendPicker = false
+    @Published var recentRequests: [PaymentRequest] = []
+    
+    func loadFriends() {
+        // In a real app, this would load friends from your backend
+    }
+    
+    func loadRecentRequests() {
+        // This would fetch recent payment requests from your backend
+        // For now, let's add some sample data
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.recentRequests = [
+                PaymentRequest(
+                    id: "1",
+                    title: "Alex Chen",
+                    description: "Lunch payment",
+                    amount: "5.00 MON",
+                    timeAgo: "2h ago",
+                    type: .user
+                ),
+                PaymentRequest(
+                    id: "2",
+                    title: "Nearby Request",
+                    description: "Coffee shop",
+                    amount: "3.50 MON",
+                    timeAgo: "Yesterday",
+                    type: .nearby
+                )
+            ]
+        }
+    }
+}
+
+class FriendsViewModel: ObservableObject {
+    @Published var friends: [Friend] = []
+    
+    func loadFriends() {
+        // In a real app, this would load from your backend
+        // For now, let's add some sample data
+        self.friends = [
+            Friend(id: "1", name: "Alex Chen", username: "@alexc", avatarName: "person.crop.circle.fill"),
+            Friend(id: "2", name: "Sam Taylor", username: "@samtaylor", avatarName: "person.crop.circle.fill"),
+            Friend(id: "3", name: "Jordan Lee", username: "@jlee", avatarName: "person.crop.circle.fill"),
+            Friend(id: "4", name: "Casey Morgan", username: "@cmorg", avatarName: "person.crop.circle.fill"),
+            Friend(id: "5", name: "Taylor Swift", username: "@taylorswift", avatarName: "person.crop.circle.fill")
+        ]
+    }
+}
+
+// MARK: - Models
+
+struct Friend: Identifiable, Equatable {
+    var id: String
+    var name: String
+    var username: String
+    var avatarName: String
+}
+
+struct PaymentRequest: Identifiable {
+    var id: String
+    var title: String
+    var description: String
+    var amount: String
+    var timeAgo: String
+    var type: RequestType
+    
+    enum RequestType {
+        case nearby
+        case user
     }
 }
 
