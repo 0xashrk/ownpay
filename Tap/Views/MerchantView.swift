@@ -214,26 +214,47 @@ struct MerchantView: View {
     
     private var recentRequestsSection: some View {
         VStack(spacing: 12) {
-            HStack {
-                Text("Recent Requests")
-                    .font(.headline)
-                
-                Spacer()
-                
-                Button(action: {
-                    // Show all requests
-                }) {
-                    Text("View All")
-                        .font(.subheadline)
-                        .foregroundColor(primaryColor)
+            // Header with expand/collapse button
+            Button(action: {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    viewModel.isRecentRequestsExpanded.toggle()
                 }
+            }) {
+                HStack {
+                    Text("Recent Requests")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    Image(systemName: viewModel.isRecentRequestsExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    if viewModel.isRecentRequestsExpanded {
+                        Button(action: {
+                            // Show all requests
+                        }) {
+                            Text("View All")
+                                .font(.subheadline)
+                                .foregroundColor(primaryColor)
+                        }
+                    }
+                }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(PlainButtonStyle())
             
-            if viewModel.recentRequests.isEmpty {
-                emptyRequestsView
-            } else {
-                ForEach(viewModel.recentRequests) { request in
-                    requestRow(request: request)
+            // Content (only visible when expanded)
+            if viewModel.isRecentRequestsExpanded {
+                if viewModel.recentRequests.isEmpty {
+                    emptyRequestsView
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                } else {
+                    ForEach(viewModel.recentRequests) { request in
+                        requestRow(request: request)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                 }
             }
         }
@@ -467,6 +488,7 @@ class MerchantViewModel: ObservableObject {
     @Published var selectedFriend: Friend?
     @Published var showingFriendPicker = false
     @Published var recentRequests: [PaymentRequest] = []
+    @Published var isRecentRequestsExpanded: Bool = true
     
     func loadFriends() {
         // In a real app, this would load friends from your backend
