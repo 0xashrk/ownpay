@@ -49,3 +49,10 @@ struct SendMonForm: View {
         }
     }
 }
+
+// Add preview
+#Preview {
+    SendMonForm { recipientAddress, amount in
+        print("Would send \(amount) MON to \(recipientAddress)")
+    }
+}
