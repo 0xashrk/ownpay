@@ -9,9 +9,16 @@ struct SendMonForm: View {
     
     let onSend: (String, Double) -> Void
     @Environment(\.dismiss) var dismiss
+    @Environment(\.colorScheme) var colorScheme
     
     // Gas buffer - leave at least this much MON for gas fees
     private let gasBuffer: Double = 0.01
+    
+    // Theme colors
+    private var accentColor: Color { Color.blue }
+    private var errorColor: Color { Color.red }
+    private var backgroundColor: Color { colorScheme == .dark ? Color.black.opacity(0.6) : Color.white }
+    private var secondaryBgColor: Color { colorScheme == .dark ? Color.black.opacity(0.3) : Color.gray.opacity(0.1) }
     
     private var maxAmount: Double {
         guard let balanceStr = privyService.balance else { return 0 }
@@ -34,67 +41,152 @@ struct SendMonForm: View {
     
     var body: some View {
         NavigationView {
-            Form {
-                Section(header: Text("Recipient Address")) {
-                    TextField("Enter wallet address", text: $recipientAddress)
-                        .autocapitalization(.none)
-                        .disableAutocorrection(true)
-                        .onAppear {
-                            recipientAddress = privyService.defaultRecipientAddress
-                        }
-                }
+            ZStack {
+                backgroundColor.ignoresSafeArea()
                 
-                Section(header: 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Amount")
-                        if maxAmount > 0 {
-                            Text("Maximum: \(String(format: "%.5f", maxAmount)) MON")
+                VStack(spacing: 24) {
+                    // Balance Info Card
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Available Balance")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        if let balance = privyService.balance {
+                            Text(balance)
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(accentColor)
+                        } else {
+                            Text("Loading balance...")
+                                .font(.title2)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        HStack {
+                            Image(systemName: "info.circle")
+                                .foregroundColor(.secondary)
+                            Text("Maximum send amount: \(String(format: "%.5f", maxAmount)) MON")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                     }
-                ) {
-                    TextField("Amount (MON)", text: $amount)
-                        .keyboardType(.decimalPad)
-                        .onAppear {
-                            // Set default amount, but ensure it's not greater than max
-                            let defaultAmount = min(privyService.defaultAmount, maxAmount)
-                            amount = String(format: "%.2f", defaultAmount)
-                        }
-                        .onChange(of: amount) { newValue in
-                            validateAmount()
-                        }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(secondaryBgColor)
+                    .cornerRadius(12)
                     
-                    if !errorMessage.isEmpty {
-                        Text(errorMessage)
-                            .font(.caption)
-                            .foregroundColor(.red)
+                    // Recipient Address
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Recipient Address")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        HStack {
+                            Image(systemName: "wallet.pass")
+                                .foregroundColor(.secondary)
+                            
+                            TextField("Enter wallet address", text: $recipientAddress)
+                                .autocapitalization(.none)
+                                .disableAutocorrection(true)
+                                .padding(10)
+                                .background(secondaryBgColor)
+                                .cornerRadius(8)
+                        }
                     }
                     
-                    Button("Use Maximum Amount") {
-                        amount = String(format: "%.5f", maxAmount)
+                    // Amount
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Amount")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        HStack {
+                            Image(systemName: "creditcard")
+                                .foregroundColor(.secondary)
+                            
+                            TextField("0.00", text: $amount)
+                                .keyboardType(.decimalPad)
+                                .padding(10)
+                                .background(secondaryBgColor)
+                                .cornerRadius(8)
+                                .onChange(of: amount) { newValue in
+                                    validateAmount()
+                                }
+                            
+                            Text("MON")
+                                .foregroundColor(.secondary)
+                                .padding(.trailing, 10)
+                        }
+                        
+                        if !errorMessage.isEmpty {
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .foregroundColor(errorColor)
+                                Text(errorMessage)
+                                    .font(.caption)
+                                    .foregroundColor(errorColor)
+                            }
+                            .padding(.top, 4)
+                        }
+                        
+                        Button(action: {
+                            amount = String(format: "%.5f", maxAmount)
+                        }) {
+                            HStack {
+                                Image(systemName: "arrow.up.to.line")
+                                Text("Use Maximum Amount")
+                            }
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 16)
+                            .background(accentColor.opacity(0.1))
+                            .foregroundColor(accentColor)
+                            .cornerRadius(8)
+                        }
+                        .disabled(maxAmount <= 0)
+                        .padding(.top, 8)
                     }
-                    .disabled(maxAmount <= 0)
+                    
+                    Spacer()
+                    
+                    // Send Button
+                    Button(action: {
+                        if let amountDouble = Double(amount), isAmountValid {
+                            Task {
+                                do {
+                                    try await privyService.sendTransaction(amount: amountDouble, to: recipientAddress)
+                                } catch {
+                                    print("Error sending transaction: \(error)")
+                                }
+                            }
+                            dismiss()
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "paperplane.fill")
+                            Text("Send \(amount.isEmpty ? "MON" : "\(amount) MON")")
+                                .fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(isAmountValid && !recipientAddress.isEmpty ? accentColor : accentColor.opacity(0.3))
+                        .foregroundColor(.white)
+                        .cornerRadius(15)
+                    }
+                    .disabled(!isAmountValid || recipientAddress.isEmpty)
                 }
+                .padding()
+            }
+            .onAppear {
+                recipientAddress = privyService.defaultRecipientAddress
+                let defaultAmount = min(privyService.defaultAmount, maxAmount)
+                amount = String(format: "%.2f", defaultAmount)
+                validateAmount()
             }
             .navigationTitle("Send MON")
             .navigationBarItems(
                 leading: Button("Cancel") {
                     dismiss()
-                },
-                trailing: Button("Send") {
-                    if let amountDouble = Double(amount), isAmountValid {
-                        Task {
-                            do {
-                                try await privyService.sendTransaction(amount: amountDouble, to: recipientAddress)
-                            } catch {
-                                print("Error sending transaction: \(error)")
-                            }
-                        }
-                        dismiss()
-                    }
                 }
-                .disabled(!isAmountValid || recipientAddress.isEmpty)
             )
             .alert(isPresented: $showMaxAmountWarning) {
                 Alert(
@@ -127,7 +219,6 @@ struct SendMonForm: View {
     }
 }
 
-// Add preview
 #Preview {
     SendMonForm { recipientAddress, amount in
         print("Would send \(amount) MON to \(recipientAddress)")
