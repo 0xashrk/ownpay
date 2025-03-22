@@ -7,10 +7,12 @@ struct SendMonForm: View {
     @State private var amount: String = ""
     @State private var showMaxAmountWarning = false
     @State private var errorMessage = ""
-    @State private var selectedFriend: ContactFriend? = nil  // Renamed to avoid ambiguity
+    @State private var selectedFriend: ContactFriend? = nil
     @State private var showingFriendPicker = false
     @State private var showingQRScanner = false
-    @State private var sendMode: SendMode = .address // Default to address mode
+    @State private var sendMode: SendMode = .address
+    @State private var isSubmitting = false
+    @State private var showingConfirmation = false
     
     let onSend: (String, Double) -> Void
     @Environment(\.dismiss) var dismiss
@@ -20,23 +22,19 @@ struct SendMonForm: View {
     private let gasBuffer: Double = 0.01
     
     // Theme colors
-    private var accentColor: Color { Color.blue }
+    private var primaryColor: Color { Color.blue }
+    private var secondaryColor: Color { Color.purple }
     private var errorColor: Color { Color.red }
+    private var surfaceColor: Color { colorScheme == .dark ? Color.black.opacity(0.3) : Color.gray.opacity(0.1) }
     private var backgroundColor: Color { colorScheme == .dark ? Color.black.opacity(0.6) : Color.white }
-    private var secondaryBgColor: Color { colorScheme == .dark ? Color.black.opacity(0.3) : Color.gray.opacity(0.1) }
-    private var selectedColor: Color { Color.purple }
     
     private var maxAmount: Double {
         guard let balanceStr = privyService.balance else { return 0 }
-        
-        // Extract the numeric part of the balance string (e.g., "10.5 MON" -> 10.5)
         let components = balanceStr.components(separatedBy: " ")
         guard let amountStr = components.first,
               let balance = Double(amountStr) else {
             return 0
         }
-        
-        // Return max amount user can send (balance minus gas buffer)
         return max(0, balance - gasBuffer)
     }
     
@@ -48,7 +46,6 @@ struct SendMonForm: View {
     private var effectiveRecipientAddress: String {
         if sendMode == .friend, let friend = selectedFriend {
             // In a real app, you'd get the wallet address from the friend object
-            // For now, we'll simulate this with the username
             return "0x" + friend.username.dropFirst().data(using: .utf8)!.map { String(format: "%02x", $0) }.joined()
         } else {
             return recipientAddress
@@ -63,219 +60,59 @@ struct SendMonForm: View {
         }
     }
     
+    private var formattedAmount: String {
+        guard let amountDouble = Double(amount), amountDouble > 0 else {
+            return "0.00 MON"
+        }
+        return "\(String(format: "%.2f", amountDouble)) MON"
+    }
+    
     var body: some View {
         NavigationView {
             ZStack {
                 backgroundColor.ignoresSafeArea()
                 
+                ScrollView {
                 VStack(spacing: 24) {
-                    // Balance Info Card
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Available Balance")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                        // Balance Card
+                        balanceCard
                         
-                        if let balance = privyService.balance {
-                            Text(balance)
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundColor(accentColor)
-                        } else {
-                            Text("Loading balance...")
-                                .font(.title2)
-                                .foregroundColor(.secondary)
+                        // Send To Section
+                        sendToSection
+                        
+                        // Amount Section
+                        amountSection
+                        
+                        // Summary Card (only shown when both fields are valid)
+                        if isSendButtonEnabled {
+                            summaryCard
+                                .transition(.opacity)
                         }
                         
-                        HStack {
-                            Image(systemName: "info.circle")
-                                .foregroundColor(.secondary)
-                            Text("Maximum send amount: \(String(format: "%.5f", maxAmount)) MON")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+                        Spacer(minLength: 30)
+                        
+                        // Send Button
+                        sendButton
                     }
                     .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(secondaryBgColor)
-                    .cornerRadius(12)
-                    
-                    // Send Mode Selector
-                    Picker("Send Mode", selection: $sendMode) {
-                        Text("Address").tag(SendMode.address)
-                        Text("Friend").tag(SendMode.friend)
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                    
-                    // Recipient Section (Address or Friend)
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(sendMode == .address ? "Recipient Address" : "Send To Friend")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                        
-                        if sendMode == .address {
-                            // Address input with QR scan option
-                            HStack {
-                                Image(systemName: "wallet.pass")
-                                    .foregroundColor(.secondary)
-                                
-                    TextField("Enter wallet address", text: $recipientAddress)
-                        .autocapitalization(.none)
-                        .disableAutocorrection(true)
-                                    .padding(10)
-                                    .background(secondaryBgColor)
-                                    .cornerRadius(8)
-                                
-                                Button(action: {
-                                    showingQRScanner = true
-                                }) {
-                                    Image(systemName: "qrcode.viewfinder")
-                                        .font(.system(size: 20))
-                                        .foregroundColor(accentColor)
-                                }
-                            }
-                        } else {
-                            // Friend selection
-                            Button(action: {
-                                showingFriendPicker = true
-                            }) {
-                                HStack {
-                                    if let friend = selectedFriend {
-                                        // Selected friend display
-                                        Circle()
-                                            .fill(selectedColor.opacity(0.2))
-                                            .frame(width: 36, height: 36)
-                                            .overlay(
-                                                Image(systemName: friend.avatarName)
-                                                    .font(.system(size: 18))
-                                                    .foregroundColor(selectedColor)
-                                            )
-                                        
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(friend.name)
-                                                .font(.body)
-                                                .foregroundColor(.primary)
-                                            
-                                            Text(friend.username)
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                    } else {
-                                        // No friend selected state
-                                        Image(systemName: "person.crop.circle.badge.plus")
-                                            .font(.system(size: 18))
-                                            .foregroundColor(selectedColor)
-                                        
-                                        Text("Select Friend")
-                                            .foregroundColor(.secondary)
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding()
-                                .background(secondaryBgColor)
-                                .cornerRadius(10)
-                            }
-                        }
-                    }
-                    
-                    // Amount
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Amount")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                        
-                        HStack {
-                            Image(systemName: "creditcard")
-                                .foregroundColor(.secondary)
-                            
-                            TextField("0.00", text: $amount)
-                        .keyboardType(.decimalPad)
-                                .padding(10)
-                                .background(secondaryBgColor)
-                                .cornerRadius(8)
-                                .onChange(of: amount) { newValue in
-                                    validateAmount()
-                                }
-                            
-                            Text("MON")
-                                .foregroundColor(.secondary)
-                                .padding(.trailing, 10)
-                        }
-                        
-                        if !errorMessage.isEmpty {
-                            HStack {
-                                Image(systemName: "exclamationmark.triangle")
-                                    .foregroundColor(errorColor)
-                                Text(errorMessage)
-                                    .font(.caption)
-                                    .foregroundColor(errorColor)
-                            }
-                            .padding(.top, 4)
-                        }
-                        
-                        Button(action: {
-                            amount = String(format: "%.5f", maxAmount)
-                        }) {
-                            HStack {
-                                Image(systemName: "arrow.up.to.line")
-                                Text("Use Maximum Amount")
-                            }
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 16)
-                            .background(accentColor.opacity(0.1))
-                            .foregroundColor(accentColor)
-                            .cornerRadius(8)
-                        }
-                        .disabled(maxAmount <= 0)
-                        .padding(.top, 8)
-                    }
-                    
-                    Spacer()
-                    
-                    // Send Button
-                    Button(action: {
-                        if let amountDouble = Double(amount), isAmountValid {
-                            Task {
-                                do {
-                                    try await privyService.sendTransaction(amount: amountDouble, to: effectiveRecipientAddress)
-                                } catch {
-                                    print("Error sending transaction: \(error)")
-                                }
-                            }
-                            dismiss()
-                        }
-                    }) {
-                        HStack {
-                            Image(systemName: "paperplane.fill")
-                            Text("Send \(amount.isEmpty ? "MON" : "\(amount) MON")")
-                                .fontWeight(.semibold)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(isSendButtonEnabled ? accentColor : accentColor.opacity(0.3))
-                        .foregroundColor(.white)
-                        .cornerRadius(15)
-                    }
-                    .disabled(!isSendButtonEnabled)
                 }
-                .padding()
+                .scrollDismissesKeyboard(.immediately)
             }
-            .onAppear {
-                recipientAddress = privyService.defaultRecipientAddress
+            .navigationTitle("Send MON")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                            dismiss()
+                    }
+                }
+            }
+                        .onAppear {
+                            recipientAddress = privyService.defaultRecipientAddress
                 let defaultAmount = min(privyService.defaultAmount, maxAmount)
                 amount = String(format: "%.2f", defaultAmount)
                 validateAmount()
             }
-            .navigationTitle("Send MON")
-            .navigationBarItems(
-                leading: Button("Cancel") {
-                    dismiss()
-                }
-            )
             .alert(isPresented: $showMaxAmountWarning) {
                 Alert(
                     title: Text("Invalid Amount"),
@@ -302,8 +139,435 @@ struct SendMonForm: View {
                     recipientAddress = result
                 }
             }
+            .overlay {
+                if showingConfirmation {
+                    transactionConfirmationView
+                }
+            }
         }
     }
+    
+    // MARK: - UI Components
+    
+    private var balanceCard: some View {
+        VStack(spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Available Balance")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    if let balance = privyService.balance {
+                        Text(balance)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(primaryColor)
+                    } else {
+                        Text("Loading balance...")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                Image(systemName: "creditcard.fill")
+                    .font(.system(size: 28))
+                    .foregroundColor(primaryColor.opacity(0.7))
+            }
+            
+            Divider()
+                .padding(.vertical, 5)
+            
+            HStack {
+                Image(systemName: "info.circle")
+                    .foregroundColor(.secondary)
+                
+                Text("Maximum send amount: \(String(format: "%.5f", maxAmount)) MON")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+            }
+        }
+        .padding()
+        .background(surfaceColor)
+        .cornerRadius(16)
+    }
+    
+    private var sendToSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Send To")
+                .font(.headline)
+                .foregroundColor(.primary)
+            
+            // Mode Selector
+            HStack(spacing: 10) {
+                // Address button
+                Button(action: { sendMode = .address }) {
+                    VStack(spacing: 8) {
+                        Image(systemName: "wallet.pass")
+                            .font(.system(size: 24))
+                        
+                        Text("Address")
+                            .font(.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(sendMode == .address ? primaryColor.opacity(0.2) : surfaceColor)
+                    .foregroundColor(sendMode == .address ? primaryColor : .gray)
+                    .cornerRadius(12)
+                }
+                
+                // Friend button
+                Button(action: { sendMode = .friend }) {
+                    VStack(spacing: 8) {
+                        Image(systemName: "person.crop.circle")
+                            .font(.system(size: 24))
+                        
+                        Text("Friend")
+                            .font(.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(sendMode == .friend ? secondaryColor.opacity(0.2) : surfaceColor)
+                    .foregroundColor(sendMode == .friend ? secondaryColor : .gray)
+                    .cornerRadius(12)
+                }
+            }
+            
+            if sendMode == .address {
+                // Address Field
+                VStack(spacing: 8) {
+                    HStack {
+                        TextField("Enter wallet address", text: $recipientAddress)
+                            .autocapitalization(.none)
+                            .disableAutocorrection(true)
+                            .padding(.vertical, 12)
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            showingQRScanner = true
+                        }) {
+                            Image(systemName: "qrcode.viewfinder")
+                                .font(.system(size: 20))
+                                .foregroundColor(primaryColor)
+                                .frame(width: 40, height: 40)
+                                .background(primaryColor.opacity(0.1))
+                                .cornerRadius(8)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .background(surfaceColor)
+                    .cornerRadius(12)
+                    
+                    if !recipientAddress.isEmpty {
+                        HStack {
+                            Text("Address looks good")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                            
+                            Spacer()
+                        }
+                        .padding(.leading, 5)
+                    }
+                }
+            } else {
+                // Friend Selection
+                Button(action: {
+                    showingFriendPicker = true
+                }) {
+                    HStack {
+                        if let friend = selectedFriend {
+                            // Selected friend
+                            ZStack {
+                                Circle()
+                                    .fill(secondaryColor.opacity(0.2))
+                                    .frame(width: 40, height: 40)
+                                
+                                Image(systemName: friend.avatarName)
+                                    .font(.system(size: 20))
+                                    .foregroundColor(secondaryColor)
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(friend.name)
+                                    .font(.body)
+                                    .foregroundColor(.primary)
+                                
+                                Text(friend.username)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(secondaryColor)
+                                .padding(.trailing, 5)
+                        } else {
+                            // No friend selected
+                            ZStack {
+                                Circle()
+                                    .fill(surfaceColor)
+                                    .frame(width: 40, height: 40)
+                                
+                                Image(systemName: "person.crop.circle.badge.plus")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(secondaryColor)
+                            }
+                            
+                            Text("Select a Friend")
+                                .foregroundColor(.secondary)
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14))
+                                .foregroundColor(.secondary)
+                                .padding(.trailing, 5)
+                        }
+                    }
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 12)
+                    .background(surfaceColor)
+                    .cornerRadius(12)
+                }
+            }
+        }
+    }
+    
+    private var amountSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Amount")
+                .font(.headline)
+                .foregroundColor(.primary)
+            
+            VStack(spacing: 10) {
+                // Amount Input
+                HStack(spacing: 8) {
+                    TextField("0.00", text: $amount)
+                        .keyboardType(.decimalPad)
+                        .font(.system(size: 22, weight: .medium))
+                        .padding(.vertical, 12)
+                        .onChange(of: amount) { newValue in
+                            validateAmount()
+                        }
+                    
+                    Text("MON")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                        .padding(.trailing, 8)
+                    
+                    Spacer()
+                    
+                    // Max amount button
+                    Button(action: {
+                        amount = String(format: "%.2f", maxAmount)
+                    }) {
+                        Text("MAX")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(primaryColor)
+                            .foregroundColor(.white)
+                            .cornerRadius(6)
+                    }
+                    .disabled(maxAmount <= 0)
+                }
+                .padding(.horizontal, 12)
+                .background(surfaceColor)
+                .cornerRadius(12)
+                
+                // Error message
+                if !errorMessage.isEmpty {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundColor(errorColor)
+                        
+                        Text(errorMessage)
+                            .font(.caption)
+                            .foregroundColor(errorColor)
+                        
+                        Spacer()
+                    }
+                    .padding(.leading, 5)
+                }
+                
+                // Value equivalents could go here (e.g., USD value)
+                if isAmountValid, let amountValue = Double(amount), amountValue > 0 {
+                    HStack {
+                        Text("≈ $\(String(format: "%.2f", amountValue * 1.21)) USD")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Spacer()
+                    }
+                    .padding(.leading, 5)
+                }
+            }
+        }
+    }
+    
+    private var summaryCard: some View {
+        VStack(spacing: 15) {
+            HStack {
+                Text("Transaction Summary")
+                    .font(.headline)
+                
+                Spacer()
+            }
+            
+            Divider()
+            
+            Group {
+                // Recipient
+                HStack(alignment: .top) {
+                    Text("Recipient:")
+                        .foregroundColor(.secondary)
+                        .frame(width: 80, alignment: .leading)
+                    
+                    if sendMode == .friend, let friend = selectedFriend {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(friend.name)
+                                .fontWeight(.medium)
+                            
+                            Text(friend.username)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Text(effectiveRecipientAddress.prefix(12) + "..." + effectiveRecipientAddress.suffix(8))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    } else {
+                        VStack(alignment: .leading) {
+                            Text(effectiveRecipientAddress.prefix(12) + "..." + effectiveRecipientAddress.suffix(8))
+                                .fontWeight(.medium)
+                        }
+                    }
+                    
+                    Spacer()
+                }
+                
+                // Amount
+                HStack {
+                    Text("Amount:")
+                        .foregroundColor(.secondary)
+                        .frame(width: 80, alignment: .leading)
+                    
+                    Text(formattedAmount)
+                        .fontWeight(.medium)
+                    
+                    Spacer()
+                }
+                
+                // Network fee
+                HStack {
+                    Text("Fee:")
+                        .foregroundColor(.secondary)
+                        .frame(width: 80, alignment: .leading)
+                    
+                    Text("≈ 0.001 MON")
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                }
+            }
+            .padding(.horizontal, 5)
+        }
+        .padding()
+        .background(surfaceColor)
+        .cornerRadius(16)
+    }
+    
+    private var sendButton: some View {
+        Button(action: {
+            if let amountDouble = Double(amount), isAmountValid {
+                withAnimation {
+                    isSubmitting = true
+                    showingConfirmation = true
+                }
+                
+                        Task {
+                            do {
+                        try await privyService.sendTransaction(amount: amountDouble, to: effectiveRecipientAddress)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            withAnimation {
+                                showingConfirmation = false
+                                isSubmitting = false
+                                dismiss()
+                            }
+                        }
+                    } catch {
+                        print("Error sending transaction: \(error)")
+                        isSubmitting = false
+                        showingConfirmation = false
+                    }
+                }
+            }
+        }) {
+            HStack {
+                if isSubmitting {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .padding(.trailing, 8)
+                } else {
+                    Image(systemName: "paperplane.fill")
+                        .padding(.trailing, 8)
+                }
+                
+                Text(isSubmitting ? "Sending..." : "Send \(formattedAmount)")
+                    .fontWeight(.semibold)
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(isSendButtonEnabled && !isSubmitting ? primaryColor : primaryColor.opacity(0.3))
+            .foregroundColor(.white)
+            .cornerRadius(16)
+        }
+        .disabled(!isSendButtonEnabled || isSubmitting)
+    }
+    
+    private var transactionConfirmationView: some View {
+        ZStack {
+            Color.black.opacity(0.7)
+                .edgesIgnoringSafeArea(.all)
+            
+            VStack(spacing: 20) {
+                if isSubmitting {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: primaryColor))
+                        .scaleEffect(1.5)
+                    
+                    Text("Sending Transaction")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .padding(.top, 20)
+                    
+                    Text("Your MON is on its way...")
+                        .foregroundColor(.secondary)
+                } else {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(.green)
+                    
+                    Text("Transaction Complete!")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                }
+            }
+            .padding(30)
+            .background(backgroundColor)
+            .cornerRadius(20)
+            .shadow(radius: 10)
+        }
+        .transition(.opacity)
+    }
+    
+    // MARK: - Helper Methods
     
     private func validateAmount() {
         guard !amount.isEmpty else {
@@ -333,7 +597,7 @@ enum SendMode {
     case friend
 }
 
-// Friend Model - renamed to avoid ambiguity with the Friend struct from MerchantView
+// Friend model
 struct ContactFriend: Identifiable, Equatable {
     var id: String
     var name: String
