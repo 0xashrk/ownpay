@@ -84,10 +84,10 @@ struct SendMonForm: View {
                         amountSection
                         
                         // Summary Card (only shown when both fields are valid)
-                        if isSendButtonEnabled {
-                            summaryCard
-                                .transition(.opacity)
-                        }
+//                        if isSendButtonEnabled {
+//                            summaryCard
+//                                .transition(.opacity)
+//                        }
                         
                         Spacer(minLength: 30)
                         
