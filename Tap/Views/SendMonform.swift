@@ -1,9 +1,11 @@
 import SwiftUI
 import AVFoundation
+import SwiftData
 
 struct SendMonForm: View {
     @StateObject private var privyService = PrivyService.shared
     @StateObject private var friendsViewModel = FriendsViewModel()
+    @Environment(\.modelContext) private var modelContext
     @State private var recipientAddress: String = ""
     @State private var amount: String = ""
     @State private var showMaxAmountWarning = false
@@ -492,9 +494,18 @@ struct SendMonForm: View {
                     showingConfirmation = true
                 }
                 
-                        Task {
-                            do {
+                Task {
+                    do {
                         try await privyService.sendTransaction(amount: amountDouble, to: effectiveRecipientAddress)
+                        
+                        // Record the transaction
+                        let transactionHash = "0x" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+                        recordTransaction(
+                            amount: amountDouble,
+                            recipient: effectiveRecipientAddress,
+                            hash: transactionHash
+                        )
+                        
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                             withAnimation {
                                 showingConfirmation = false
@@ -587,6 +598,29 @@ struct SendMonForm: View {
             errorMessage = "Amount exceeds your available balance (including gas fee)"
         } else {
             errorMessage = ""
+        }
+    }
+    
+    private func recordTransaction(amount: Double, recipient: String, hash: String) {
+        let transaction = PaymentTransaction(
+            isApproved: true,
+            transactionHash: hash,
+            amount: String(amount),
+            sender: privyService.walletAddress,
+            recipient: recipient,
+            note: nil,
+            timestamp: Date(),
+            type: .sent,
+            status: .completed
+        )
+        
+        // Add to SwiftData
+        modelContext.insert(transaction)
+        
+        do {
+            try modelContext.save()
+        } catch {
+            print("Error saving transaction: \(error)")
         }
     }
 }
