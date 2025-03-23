@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 class MerchantViewModel: ObservableObject {
     @Published var selectedFriend: Friend?
@@ -6,6 +7,7 @@ class MerchantViewModel: ObservableObject {
     @Published var showingRequestForm = false
     @Published var recentRequests: [PaymentRequest] = []
     @Published var isRecentRequestsExpanded: Bool = true
+    @Published var navigationPath = NavigationPath()
     
     func loadFriends() {
         // In a real app, this would load friends from your backend

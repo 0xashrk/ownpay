@@ -20,6 +20,8 @@ struct MerchantView: View {
     @StateObject private var viewModel = MerchantViewModel()
     @Environment(\.colorScheme) var colorScheme
     
+    @State private var showingRequestFormForFriend = false
+    
     // Initialize with existing parameters to avoid breaking changes
     init(showingRequestForm: Binding<Bool>, 
          showingSendForm: Binding<Bool>,
@@ -55,29 +57,25 @@ struct MerchantView: View {
             .padding(.horizontal)
         }
         .sheet(isPresented: $viewModel.showingFriendPicker) {
-            NavigationView {
+            NavigationStack(path: $viewModel.navigationPath) {
                 FriendPickerView(
                     selectedFriend: $viewModel.selectedFriend,
                     isPresented: $viewModel.showingFriendPicker
                 ) { friend in
-                    viewModel.selectedFriend = friend
-                    viewModel.showingFriendPicker = false
-                    viewModel.showingRequestForm = true
+                    let destination = RequestPaymentFormView(
+                        amount: .constant(""),
+                        selectedFriend: friend
+                    ) { amount, note in
+                        viewModel.showingFriendPicker = false
+                    }
+                    viewModel.navigationPath.append(destination)
+                }
+                .navigationDestination(for: RequestPaymentFormView.self) { view in
+                    view
+                        .navigationTitle("Request Payment")
+                        .navigationBarTitleDisplayMode(.inline)
                 }
             }
-        }
-        .sheet(isPresented: $viewModel.showingRequestForm) {
-            RequestPaymentFormView(
-                amount: .constant(""),
-                selectedFriend: viewModel.selectedFriend
-            ) { amount, note in
-                // This will only be called for contactless requests
-                // Friend requests are handled within RequestPaymentFormView
-                // ... existing contactless request handling ...
-            }
-        }
-        .onChange(of: viewModel.selectedFriend) { newValue in
-            // Could trigger additional actions when friend is selected
         }
         .onAppear {
             viewModel.loadFriends()
