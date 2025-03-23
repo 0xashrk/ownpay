@@ -208,7 +208,3 @@ struct FriendPickerView: View {
         .buttonStyle(PlainButtonStyle())
     }
 }
-
-#Preview {
-    FriendPickerView()
-}
