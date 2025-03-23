@@ -375,6 +375,32 @@ class APIService {
         
         return try JSONDecoder().decode(PaymentRequestResponse.self, from: data)
     }
+    
+    func getReceivedPaymentRequests() async throws -> [PaymentRequestModel] {
+        guard let url = URL(string: "\(P2P_BASE_URL)/p2p/payment-requests/received") else {
+            throw APIError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        if let token = getAuthToken() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        let (data, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw APIError.serverError(httpResponse.statusCode, String(data: data, encoding: .utf8) ?? "Unknown error")
+        }
+        
+        return try JSONDecoder().decode([PaymentRequestModel].self, from: data)
+    }
 }
 
 // MARK: - Empty Response Types for endpoints with no return data

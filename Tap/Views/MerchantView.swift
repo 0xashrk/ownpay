@@ -251,33 +251,36 @@ struct MerchantView: View {
                         .font(.headline)
                         .foregroundColor(.primary)
                     
-                    Image(systemName: viewModel.isRecentRequestsExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 14))
-                        .foregroundColor(.secondary)
+                    if viewModel.isLoading {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                            .padding(.leading, 4)
+                    }
                     
                     Spacer()
                     
-                    if viewModel.isRecentRequestsExpanded {
-                        Button(action: {
-                            // Show all requests
-                        }) {
-                            Text("View All")
-                                .font(.subheadline)
-                                .foregroundColor(primaryColor)
-                        }
-                    }
+                    Image(systemName: viewModel.isRecentRequestsExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(PlainButtonStyle())
             
-            // Content (only visible when expanded)
             if viewModel.isRecentRequestsExpanded {
-                if viewModel.recentRequests.isEmpty {
+                if viewModel.isLoading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                } else if let error = viewModel.error {
+                    Text(error.localizedDescription)
+                        .foregroundColor(.red)
+                        .padding()
+                } else if viewModel.recentRequests.isEmpty {
                     emptyRequestsView
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 } else {
-                    ForEach(viewModel.recentRequests) { request in
+                    ForEach(viewModel.recentRequests, id: \.id) { request in
                         requestRow(request: request)
                             .transition(.opacity.combined(with: .move(edge: .top)))
                     }
@@ -285,6 +288,9 @@ struct MerchantView: View {
             }
         }
         .padding(.top)
+        .onAppear {
+            viewModel.loadRecentRequests()
+        }
     }
     
     private var emptyRequestsView: some View {
@@ -309,37 +315,62 @@ struct MerchantView: View {
         .cornerRadius(12)
     }
     
-    private func requestRow(request: PaymentRequest) -> some View {
+    private func requestRow(request: PaymentRequestModel) -> some View {
         HStack(spacing: 12) {
             // Avatar/Icon
-            Image(systemName: request.type == .user ? "person.crop.circle.fill" : "wave.3.right.circle.fill")
+            Image(systemName: "person.crop.circle.fill")
                 .font(.system(size: 36))
-                .foregroundColor(request.type == .user ? secondaryColor : primaryColor)
+                .foregroundColor(secondaryColor)
             
             // Details
             VStack(alignment: .leading, spacing: 4) {
-                Text(request.title)
+                Text(request.requesterUsername ?? "Unknown")
                     .font(.headline)
                 
-                Text(request.description)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                if let note = request.note {
+                    Text(note)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
                 
-                Text(request.timeAgo)
+                Text(request.requestTimestamp, style: .relative)
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
             
             Spacer()
             
-            // Amount
-            Text(request.amount)
-                .font(.headline)
-                .foregroundColor(.primary)
+            // Amount and Status
+            VStack(alignment: .trailing, spacing: 4) {
+                Text("\(request.amount.formatted()) MON")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Text(request.status.rawValue)
+                    .font(.caption)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(statusColor(for: request.status))
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+            }
         }
         .padding()
         .background(surfaceColor)
         .cornerRadius(12)
+    }
+    
+    private func statusColor(for status: PaymentRequestModel.RequestStatus) -> Color {
+        switch status {
+        case .pending:
+            return .orange
+        case .approved:
+            return .green
+        case .rejected:
+            return .red
+        case .expired:
+            return .gray
+        }
     }
 }
 

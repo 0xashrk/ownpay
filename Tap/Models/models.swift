@@ -200,6 +200,51 @@ struct PaymentRequestModel: Codable {
         case friendUsername = "friend_username"
         case friendWallet = "friend_wallet"
     }
+    
+    // Add custom decoding init to handle date strings
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // Decode simple properties
+        id = try container.decode(UUID.self, forKey: .id)
+        requesterId = try container.decode(String.self, forKey: .requesterId)
+        friendId = try container.decode(String.self, forKey: .friendId)
+        amount = try container.decode(Decimal.self, forKey: .amount)
+        note = try container.decodeIfPresent(String.self, forKey: .note)
+        status = try container.decode(RequestStatus.self, forKey: .status)
+        transactionHash = try container.decodeIfPresent(String.self, forKey: .transactionHash)
+        
+        // Decode optional joined data
+        requesterUsername = try container.decodeIfPresent(String.self, forKey: .requesterUsername)
+        requesterWallet = try container.decodeIfPresent(String.self, forKey: .requesterWallet)
+        friendUsername = try container.decodeIfPresent(String.self, forKey: .friendUsername)
+        friendWallet = try container.decodeIfPresent(String.self, forKey: .friendWallet)
+        
+        // Decode dates with proper formatting
+        let dateFormatter = ISO8601DateFormatter()
+        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        if let requestTimestampStr = try container.decodeIfPresent(String.self, forKey: .requestTimestamp),
+           let date = dateFormatter.date(from: requestTimestampStr) {
+            requestTimestamp = date
+        } else {
+            requestTimestamp = Date() // Fallback to current date if parsing fails
+        }
+        
+        if let responseTimestampStr = try container.decodeIfPresent(String.self, forKey: .responseTimestamp),
+           let date = dateFormatter.date(from: responseTimestampStr) {
+            responseTimestamp = date
+        } else {
+            responseTimestamp = nil
+        }
+        
+        if let expiresAtStr = try container.decodeIfPresent(String.self, forKey: .expiresAt),
+           let date = dateFormatter.date(from: expiresAtStr) {
+            expiresAt = date
+        } else {
+            expiresAt = Calendar.current.date(byAdding: .hour, value: 24, to: Date()) ?? Date() // Default 24h expiry
+        }
+    }
 }
 
 // Helper extension to convert between models
