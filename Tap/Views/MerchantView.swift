@@ -364,7 +364,46 @@ struct FriendPickerView: View {
             .cornerRadius(10)
             .padding()
             
-            if filteredFriends.isEmpty {
+            if viewModel.isLoading {
+                ProgressView("Loading friends...")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error = viewModel.error {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 50))
+                        .foregroundColor(.red.opacity(0.5))
+                        .padding()
+                    
+                    Text("Error loading friends")
+                        .font(.headline)
+                    
+                    if let apiError = error as? APIError {
+                        Text(apiError.localizedDescription)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    } else {
+                        Text("Unable to load friends. Please try again.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                    
+                    Button(action: {
+                        viewModel.loadFriends()
+                    }) {
+                        Label("Retry", systemImage: "arrow.clockwise")
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                    }
+                }
+                .padding()
+            } else if filteredFriends.isEmpty {
                 emptyFriendsView
             } else {
                 // Friends list
@@ -522,17 +561,40 @@ class MerchantViewModel: ObservableObject {
 
 class FriendsViewModel: ObservableObject {
     @Published var friends: [Friend] = []
+    @Published var isLoading = false
+    @Published var error: Error?
     
     func loadFriends() {
-        // In a real app, this would load from your backend
-        // For now, let's add some sample data
-        self.friends = [
-            Friend(id: "1", name: "Alex Chen", username: "@alexc", avatarName: "person.crop.circle.fill"),
-            Friend(id: "2", name: "Sam Taylor", username: "@samtaylor", avatarName: "person.crop.circle.fill"),
-            Friend(id: "3", name: "Jordan Lee", username: "@jlee", avatarName: "person.crop.circle.fill"),
-            Friend(id: "4", name: "Casey Morgan", username: "@cmorg", avatarName: "person.crop.circle.fill"),
-            Friend(id: "5", name: "Taylor Swift", username: "@taylorswift", avatarName: "person.crop.circle.fill")
-        ]
+        isLoading = true
+        error = nil
+        
+        print("🔄 Starting to load friends...")
+        
+        Task {
+            do {
+                print("📡 Making API request to fetch user profiles...")
+                let profiles = try await APIService.shared.getUserProfiles()
+                print("📥 Received \(profiles.count) profiles from API")
+                
+                await MainActor.run {
+                    self.friends = profiles.map { profile in
+                        Friend(
+                            id: profile.id,
+                            name: profile.username,
+                            username: "@\(profile.username)",
+                            avatarName: "person.crop.circle.fill"
+                        )
+                    }
+                    self.isLoading = false
+                }
+            } catch {
+                print("❌ Error in loadFriends: \(error)")
+                await MainActor.run {
+                    self.error = error
+                    self.isLoading = false
+                }
+            }
+        }
     }
 }
 

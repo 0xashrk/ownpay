@@ -91,6 +91,29 @@ struct UsernameAvailabilityResponse: Decodable {
     let taken: Bool
 }
 
+// Add this model structure with proper CodingKeys
+struct UserProfile: Codable {
+    let id: String
+    let email: String?
+    let twitter: String
+    let username: String
+    let updatedAt: String
+    let createdAt: String
+    let ethereumWallet: String?
+    let solanaWallet: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case email
+        case twitter
+        case username
+        case updatedAt = "updated_at"
+        case createdAt = "created_at"
+        case ethereumWallet = "ethereum_wallet"
+        case solanaWallet = "solana_wallet"
+    }
+}
+
 // MARK: - API Service
 class APIService {
     static let shared = APIService()
@@ -99,6 +122,8 @@ class APIService {
     private let session: URLSession
     private let tokenRetrySubject = PassthroughSubject<Void, Never>()
     private var tokenRetrySubscription: AnyCancellable?
+    
+    private let P2P_BASE_URL = "http://127.0.0.1:8000"
     
     private init() {
         let config = URLSessionConfiguration.default
@@ -130,6 +155,14 @@ class APIService {
         return nil
     }
     
+    // Add this helper method to handle JWT token formatting
+    private func getFormattedAuthToken() -> String? {
+        if let token = getAuthToken() {
+            return "Bearer \(token)"
+        }
+        return nil
+    }
+    
     private func buildRequest(for path: String, method: String, body: Data? = nil, requiresAuth: Bool = true) throws -> URLRequest {
         guard let url = URL(string: "\(environment.baseURL)\(path)") else {
             throw APIError.invalidURL
@@ -141,10 +174,11 @@ class APIService {
         
         // Add auth token if required
         if requiresAuth {
-            guard let token = getAuthToken() else {
+            guard let formattedToken = getFormattedAuthToken() else {
+                print("Failed to get auth token for request to: \(path)")
                 throw APIError.notAuthenticated
             }
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue(formattedToken, forHTTPHeaderField: "Authorization")
         }
         
         if let body = body {
@@ -276,6 +310,33 @@ class APIService {
         print("Profile update response: \(response)")
         
         return response
+    }
+    
+    // Update the getUserProfiles method to be clean and consistent
+    func getUserProfiles() async throws -> [UserProfile] {
+        guard let url = URL(string: "\(P2P_BASE_URL)/p2p/user-profiles") else {
+            throw APIError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        if let token = getAuthToken() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        let (data, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw APIError.serverError(httpResponse.statusCode, String(data: data, encoding: .utf8) ?? "Unknown error")
+        }
+        
+        return try JSONDecoder().decode([UserProfile].self, from: data)
     }
 }
 
