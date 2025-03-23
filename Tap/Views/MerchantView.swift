@@ -85,6 +85,18 @@ struct MerchantView: View {
                 viewModel.showingFriendPicker = false
             }
         }
+        .sheet(isPresented: $showingRequestForm) {
+            NavigationStack {
+                RequestPaymentFormView(
+                    amount: .constant(""),
+                    onRequest: { amount, note in
+                        showingRequestForm = false
+                    }
+                )
+                .navigationTitle("Request Payment")
+                .navigationBarTitleDisplayMode(.inline)
+            }
+        }
         .onAppear {
             viewModel.loadFriends()
         }
