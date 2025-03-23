@@ -300,3 +300,26 @@ struct PaymentRequestResponse: Codable {
         case expiresAt = "expires_at"
     }
 }
+
+struct UserProfile: Codable {
+    let id: String
+    let email: String?
+    let twitter: String?
+    let username: String
+    let updatedAt: String
+    let createdAt: String
+    let ethereumWallet: String?
+    let solanaWallet: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case email
+        case twitter
+        case username
+        case updatedAt = "updated_at"
+        case createdAt = "created_at"
+        case ethereumWallet = "ethereum_wallet"
+        case solanaWallet = "solana_wallet"
+    }
+}
+

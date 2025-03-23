@@ -91,29 +91,6 @@ struct UsernameAvailabilityResponse: Decodable {
     let taken: Bool
 }
 
-// Add this model structure with proper CodingKeys
-struct UserProfile: Codable {
-    let id: String
-    let email: String?
-    let twitter: String
-    let username: String
-    let updatedAt: String
-    let createdAt: String
-    let ethereumWallet: String?
-    let solanaWallet: String?
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case email
-        case twitter
-        case username
-        case updatedAt = "updated_at"
-        case createdAt = "created_at"
-        case ethereumWallet = "ethereum_wallet"
-        case solanaWallet = "solana_wallet"
-    }
-}
-
 // MARK: - API Service
 class APIService {
     static let shared = APIService()
@@ -390,6 +367,20 @@ class APIService {
         }
         
         let (data, response) = try await session.data(for: request)
+        
+        // Print the raw JSON response
+        if let jsonString = String(data: data, encoding: .utf8) {
+            print("Received Payment Requests JSON Response:")
+            print(jsonString)
+            
+            // Pretty print JSON for better readability
+            if let jsonObject = try? JSONSerialization.jsonObject(with: data),
+               let prettyData = try? JSONSerialization.data(withJSONObject: jsonObject, options: .prettyPrinted),
+               let prettyString = String(data: prettyData, encoding: .utf8) {
+                print("\nPretty Printed JSON:")
+                print(prettyString)
+            }
+        }
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
