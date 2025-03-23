@@ -170,6 +170,19 @@ struct PaymentRequestModel: Codable {
     let responseTimestamp: Date?
     let transactionHash: String?
     let expiresAt: Date
+    let requester: RequesterInfo?
+    
+    struct RequesterInfo: Codable {
+        let id: String
+        let username: String
+        let ethereumWallet: String
+        
+        enum CodingKeys: String, CodingKey {
+            case id
+            case username
+            case ethereumWallet = "ethereum_wallet"
+        }
+    }
     
     // Joined data from user_profiles (optional as they come from joins)
     var requesterUsername: String?
@@ -199,6 +212,7 @@ struct PaymentRequestModel: Codable {
         case requesterWallet = "requester_wallet"
         case friendUsername = "friend_username"
         case friendWallet = "friend_wallet"
+        case requester
     }
     
     // Add custom decoding init to handle date strings
@@ -244,6 +258,8 @@ struct PaymentRequestModel: Codable {
         } else {
             expiresAt = Calendar.current.date(byAdding: .hour, value: 24, to: Date()) ?? Date() // Default 24h expiry
         }
+        
+        requester = try container.decodeIfPresent(RequesterInfo.self, forKey: .requester)
     }
 }
 

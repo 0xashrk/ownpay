@@ -316,44 +316,69 @@ struct MerchantView: View {
     }
     
     private func requestRow(request: PaymentRequestModel) -> some View {
-        HStack(spacing: 12) {
-            // Avatar/Icon
-            Image(systemName: "person.crop.circle.fill")
-                .font(.system(size: 36))
-                .foregroundColor(secondaryColor)
-            
-            // Details
-            VStack(alignment: .leading, spacing: 4) {
-                Text(request.requesterUsername ?? "Unknown")
-                    .font(.headline)
+        VStack(spacing: 12) {
+            // Top section with user and amount
+            HStack(spacing: 12) {
+                // Avatar/Icon
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.system(size: 36))
+                    .foregroundColor(secondaryColor)
                 
-                if let note = request.note {
-                    Text(note)
-                        .font(.caption)
+                // Details
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(request.requester?.username ?? "Unknown")
+                        .font(.headline)
+                    
+                    if let note = request.note {
+                        Text(note)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Text(request.requestTimestamp, style: .relative)
+                        .font(.caption2)
                         .foregroundColor(.secondary)
                 }
                 
-                Text(request.requestTimestamp, style: .relative)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            // Amount and Status
-            VStack(alignment: .trailing, spacing: 4) {
+                Spacer()
+                
+                // Amount
                 Text("\(request.amount.formatted()) MON")
                     .font(.headline)
                     .foregroundColor(.primary)
-                
-                Text(request.status.rawValue)
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(statusColor(for: request.status))
-                    .foregroundColor(.white)
-                    .cornerRadius(8)
             }
+            
+            // Bottom section with buttons
+            HStack(spacing: 12) {
+                // Pay Button
+                Button(action: {
+                    // TODO: Implement pay action
+                }) {
+                    Text("Pay")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                }
+                
+                // Reject Button
+                Button(action: {
+                    // TODO: Implement reject action
+                }) {
+                    Text("Reject")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color.red)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                }
+            }
+            .padding(.top, 8)
         }
         .padding()
         .background(surfaceColor)
