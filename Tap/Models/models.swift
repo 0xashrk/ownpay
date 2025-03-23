@@ -157,3 +157,65 @@ final class PaymentTransaction {
         return "\(prefix)0 MON"
     }
 }
+
+// MARK: - Payment Request Models
+struct PaymentRequestModel: Codable {
+    let id: UUID
+    let requesterId: String
+    let friendId: String
+    let amount: Decimal
+    let note: String?
+    let requestTimestamp: Date
+    let status: RequestStatus
+    let responseTimestamp: Date?
+    let transactionHash: String?
+    let expiresAt: Date
+    
+    // Joined data from user_profiles (optional as they come from joins)
+    var requesterUsername: String?
+    var requesterWallet: String?
+    var friendUsername: String?
+    var friendWallet: String?
+    
+    enum RequestStatus: String, Codable {
+        case pending
+        case approved
+        case rejected
+        case expired
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case requesterId = "requester_id"
+        case friendId = "friend_id"
+        case amount
+        case note
+        case requestTimestamp = "request_timestamp"
+        case status
+        case responseTimestamp = "response_timestamp"
+        case transactionHash = "transaction_hash"
+        case expiresAt = "expires_at"
+        case requesterUsername = "requester_username"
+        case requesterWallet = "requester_wallet"
+        case friendUsername = "friend_username"
+        case friendWallet = "friend_wallet"
+    }
+}
+
+// Helper extension to convert between models
+extension PaymentTransaction {
+    static func fromRequest(_ request: PaymentRequestModel) -> PaymentTransaction {
+        return PaymentTransaction(
+            isApproved: request.status == .approved,
+            transactionHash: request.transactionHash,
+            amount: request.amount.description,
+            sender: request.requesterWallet,
+            recipient: request.friendWallet,
+            note: request.note,
+            timestamp: request.requestTimestamp,
+            type: .sent,
+            status: request.status == .approved ? .completed : 
+                    request.status == .pending ? .pending : .failed
+        )
+    }
+}
