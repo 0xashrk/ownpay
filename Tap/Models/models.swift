@@ -219,3 +219,39 @@ extension PaymentTransaction {
         )
     }
 }
+
+// Add this to your existing models.swift
+struct CreatePaymentRequestBody: Codable {
+    let friendId: String
+    let amount: Decimal
+    let note: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case friendId = "friend_id"
+        case amount
+        case note
+    }
+}
+
+// Response model for created payment request
+struct PaymentRequestResponse: Codable {
+    let id: UUID
+    let requesterId: String
+    let friendId: String
+    let amount: Decimal
+    let note: String?
+    let requestTimestamp: String
+    let status: String
+    let expiresAt: String
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case requesterId = "requester_id"
+        case friendId = "friend_id"
+        case amount
+        case note
+        case requestTimestamp = "request_timestamp"
+        case status
+        case expiresAt = "expires_at"
+    }
+}

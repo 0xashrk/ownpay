@@ -3,6 +3,7 @@ import Foundation
 class MerchantViewModel: ObservableObject {
     @Published var selectedFriend: Friend?
     @Published var showingFriendPicker = false
+    @Published var showingRequestForm = false
     @Published var recentRequests: [PaymentRequest] = []
     @Published var isRecentRequestsExpanded: Bool = true
     

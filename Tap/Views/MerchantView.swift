@@ -58,15 +58,23 @@ struct MerchantView: View {
             NavigationView {
                 FriendPickerView(
                     selectedFriend: $viewModel.selectedFriend,
-                    isPresented: $viewModel.showingFriendPicker,
-                    onSendRequest: { friend in
-                        viewModel.selectedFriend = friend
-                        viewModel.showingFriendPicker = false
-                        showingRequestForm = true
-                    }
-                )
+                    isPresented: $viewModel.showingFriendPicker
+                ) { friend in
+                    viewModel.selectedFriend = friend
+                    viewModel.showingFriendPicker = false
+                    viewModel.showingRequestForm = true
+                }
             }
-            .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $viewModel.showingRequestForm) {
+            RequestPaymentFormView(
+                amount: .constant(""),
+                selectedFriend: viewModel.selectedFriend
+            ) { amount, note in
+                // This will only be called for contactless requests
+                // Friend requests are handled within RequestPaymentFormView
+                // ... existing contactless request handling ...
+            }
         }
         .onChange(of: viewModel.selectedFriend) { newValue in
             // Could trigger additional actions when friend is selected

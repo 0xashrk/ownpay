@@ -12,14 +12,48 @@ extension View {
 struct RequestPaymentFormView: View {
     @StateObject private var viewModel: RequestPaymentViewModel
     @Environment(\.dismiss) var dismiss
+    let selectedFriend: Friend?
+    @State private var isSubmitting = false
+    @State private var error: Error?
     
-    init(amount: Binding<String>, onRequest: @escaping (Double, String) -> Void) {
+    init(amount: Binding<String>, selectedFriend: Friend? = nil, onRequest: @escaping (Double, String) -> Void) {
         // Initialize with default 0.025 value
         let defaultAmount = "0.025"
         if amount.wrappedValue.isEmpty || amount.wrappedValue == "1" {
             amount.wrappedValue = defaultAmount
         }
+        self.selectedFriend = selectedFriend
         _viewModel = StateObject(wrappedValue: RequestPaymentViewModel(amount: amount, onRequest: onRequest))
+    }
+    
+    private func submitRequest() {
+        guard let amount = Double(viewModel.amount) else { return }
+        
+        if let friend = selectedFriend {
+            // This is a friend request - use API
+            Task {
+                isSubmitting = true
+                do {
+                    let response = try await APIService.shared.createPaymentRequest(
+                        friendId: friend.id,
+                        amount: Decimal(amount),
+                        note: viewModel.note.isEmpty ? nil : viewModel.note
+                    )
+                    await MainActor.run {
+                        isSubmitting = false
+                        dismiss()
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.error = error
+                        isSubmitting = false
+                    }
+                }
+            }
+        } else {
+            // This is a contactless request - use existing flow
+            viewModel.submitRequest()
+        }
     }
     
     var body: some View {
@@ -145,21 +179,26 @@ struct RequestPaymentFormView: View {
                     
                     Spacer()
                     
-                    Button(action: {
-                        viewModel.submitRequest()
-                    }) {
-                        Text("Request Payment")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(viewModel.isRequestEnabled ? Color.blue : Color.gray)
-                            )
-                            .padding(.horizontal)
+                    Button(action: submitRequest) {
+                        HStack {
+                            if isSubmitting {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .padding(.trailing, 8)
+                            }
+                            Text(isSubmitting ? "Requesting..." : "Request Payment")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(viewModel.isRequestEnabled ? Color.blue : Color.gray)
+                        )
+                        .padding(.horizontal)
                     }
-                    .disabled(!viewModel.isRequestEnabled)
+                    .disabled(!viewModel.isRequestEnabled || isSubmitting)
                     .padding(.bottom, 20)
                 }
                 .padding(.top, 20)
@@ -174,6 +213,17 @@ struct RequestPaymentFormView: View {
                     dismiss()
                 }
             )
+            
+            // Add error alert
+            .alert("Error", isPresented: .constant(error != nil)) {
+                Button("OK") {
+                    error = nil
+                }
+            } message: {
+                if let error = error {
+                    Text(error.localizedDescription)
+                }
+            }
         }
     }
 } 
