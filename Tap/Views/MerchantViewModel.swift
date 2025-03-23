@@ -17,7 +17,11 @@ class MerchantViewModel: ObservableObject {
     
     func loadRecentRequests() {
         Task {
-            isLoading = true
+            await MainActor.run {
+                self.isLoading = true
+                self.error = nil
+            }
+            
             do {
                 let requests = try await APIService.shared.getReceivedPaymentRequests()
                 await MainActor.run {
