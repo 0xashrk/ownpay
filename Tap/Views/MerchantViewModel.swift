@@ -37,4 +37,9 @@ class MerchantViewModel: ObservableObject {
             ]
         }
     }
+    
+    func dismissAll() {
+        navigationPath.removeLast(navigationPath.count)  // Clear navigation stack
+        showingFriendPicker = false  // Dismiss sheet
+    }
 }

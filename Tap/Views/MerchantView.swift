@@ -8,6 +8,11 @@
 import SwiftUI
 import Combine
 
+// Add this at the top of the file, after the imports
+extension Notification.Name {
+    static let dismissFriendPicker = Notification.Name("dismissFriendPicker")
+}
+
 struct MerchantView: View {
     @Binding var showingRequestForm: Bool
     @Binding var showingSendForm: Bool
@@ -75,6 +80,9 @@ struct MerchantView: View {
                         .navigationTitle("Request Payment")
                         .navigationBarTitleDisplayMode(.inline)
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .dismissFriendPicker)) { _ in
+                viewModel.showingFriendPicker = false
             }
         }
         .onAppear {

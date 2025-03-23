@@ -16,8 +16,9 @@ struct RequestPaymentFormView: View, Hashable {
     @State private var isSubmitting = false
     @State private var error: Error?
     
-    init(amount: Binding<String>, selectedFriend: Friend? = nil, onRequest: @escaping (Double, String) -> Void) {
-        // Initialize with default 0.025 value
+    init(amount: Binding<String>, 
+         selectedFriend: Friend? = nil,
+         onRequest: @escaping (Double, String) -> Void) {
         let defaultAmount = "0.025"
         if amount.wrappedValue.isEmpty || amount.wrappedValue == "1" {
             amount.wrappedValue = defaultAmount
@@ -30,7 +31,6 @@ struct RequestPaymentFormView: View, Hashable {
         guard let amount = Double(viewModel.amount) else { return }
         
         if let friend = selectedFriend {
-            // This is a friend request - use API
             Task {
                 isSubmitting = true
                 do {
@@ -41,7 +41,7 @@ struct RequestPaymentFormView: View, Hashable {
                     )
                     await MainActor.run {
                         isSubmitting = false
-                        dismiss()
+                        NotificationCenter.default.post(name: .dismissFriendPicker, object: nil)
                     }
                 } catch {
                     await MainActor.run {
@@ -51,7 +51,6 @@ struct RequestPaymentFormView: View, Hashable {
                 }
             }
         } else {
-            // This is a contactless request - use existing flow
             viewModel.submitRequest()
         }
     }
