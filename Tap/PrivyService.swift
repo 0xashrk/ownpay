@@ -12,7 +12,7 @@ class PrivyService: ObservableObject {
     @Published private var isWalletOperationInProgress = false
     
     // Add default values as published properties
-    @Published var defaultRecipientAddress: String = "0x7C9976116d7d65cfE84580FEdBB2D96A0C6434C6"
+    @Published var defaultRecipientAddress: String = ""
     @Published var defaultAmount: Double = 2.0
     
     // Add this property to store the token
