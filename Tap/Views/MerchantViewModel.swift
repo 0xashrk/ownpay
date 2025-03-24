@@ -11,10 +11,6 @@ class MerchantViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var error: Error?
     
-    func loadFriends() {
-        // In a real app, this would load friends from your backend
-    }
-    
     func loadRecentRequests() {
         Task {
             await MainActor.run {
