@@ -7,11 +7,17 @@
 
 import SwiftUI
 
+enum FriendPickerMode {
+    case send
+    case request
+}
+
 struct FriendPickerView: View {
     @Binding var selectedFriend: Friend?
     @Binding var isPresented: Bool
+    let mode: FriendPickerMode
+    let onSelect: (Friend) -> Void
     @State private var searchText = ""
-    let onSendRequest: (Friend) -> Void
     
     @StateObject private var viewModel = FriendsViewModel()
     @Environment(\.colorScheme) var colorScheme
@@ -26,6 +32,15 @@ struct FriendPickerView: View {
                 $0.name.lowercased().contains(searchText.lowercased()) ||
                 $0.username.lowercased().contains(searchText.lowercased())
             }
+        }
+    }
+    
+    var buttonTitle: String {
+        switch mode {
+        case .send:
+            return "Select"
+        case .request:
+            return "Request"
         }
     }
     
@@ -162,7 +177,7 @@ struct FriendPickerView: View {
     private func friendRow(friend: Friend) -> some View {
         Button(action: {
             selectedFriend = friend
-            onSendRequest(friend)
+            onSelect(friend)
         }) {
             HStack(spacing: 16) {
                 // Avatar image
@@ -191,9 +206,9 @@ struct FriendPickerView: View {
                 // Direct request button
                 Button(action: {
                     selectedFriend = friend
-                    onSendRequest(friend)
+                    onSelect(friend)
                 }) {
-                    Text("Request")
+                    Text(buttonTitle)
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .padding(.horizontal, 16)

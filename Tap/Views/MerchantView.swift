@@ -66,33 +66,35 @@ struct MerchantView: View {
             NavigationStack(path: $viewModel.navigationPath) {
                 FriendPickerView(
                     selectedFriend: $viewModel.selectedFriend,
-                    isPresented: $viewModel.showingFriendPicker
-                ) { friend in
-                    let destination = RequestPaymentFormView(
-                        amount: .constant(""),
-                        selectedFriend: friend,
-                        onRequest: { amount, note in
-                            // Call the API to create payment request
-                            Task {
-                                do {
-                                    // Convert Double to Decimal
-                                    let decimalAmount = Decimal(amount)
-                                    _ = try await APIService.shared.createPaymentRequest(
-                                        friendId: friend.id,
-                                        amount: decimalAmount,  // Now passing Decimal
-                                        note: note
-                                    )
-                                    await MainActor.run {
-                                        viewModel.showingFriendPicker = false
+                    isPresented: $viewModel.showingFriendPicker,
+                    mode: .request,
+                    onSelect: { friend in
+                        let destination = RequestPaymentFormView(
+                            amount: .constant(""),
+                            selectedFriend: friend,
+                            onRequest: { amount, note in
+                                // Call the API to create payment request
+                                Task {
+                                    do {
+                                        // Convert Double to Decimal
+                                        let decimalAmount = Decimal(amount)
+                                        _ = try await APIService.shared.createPaymentRequest(
+                                            friendId: friend.id,
+                                            amount: decimalAmount,  // Now passing Decimal
+                                            note: note
+                                        )
+                                        await MainActor.run {
+                                            viewModel.showingFriendPicker = false
+                                        }
+                                    } catch {
+                                        print("Error creating payment request: \(error)")
                                     }
-                                } catch {
-                                    print("Error creating payment request: \(error)")
                                 }
                             }
-                        }
-                    )
-                    viewModel.navigationPath.append(destination)
-                }
+                        )
+                        viewModel.navigationPath.append(destination)
+                    }
+                )
                 .navigationDestination(for: RequestPaymentFormView.self) { view in
                     view
                         .navigationTitle("Request Payment")

@@ -128,7 +128,8 @@ struct SendMonForm: View {
                 NavigationView {
                     FriendPickerView(
                         selectedFriend: $selectedFriend,
-                        isPresented: $showingFriendPicker
+                        isPresented: $showingFriendPicker,
+                        mode: .send
                     ) { friend in
                         selectedFriend = friend
                         showingFriendPicker = false
