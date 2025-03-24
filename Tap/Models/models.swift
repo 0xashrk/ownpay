@@ -339,3 +339,12 @@ struct UserProfile: Codable {
     }
 }
 
+// Add this to your models.swift file
+struct Friend: Identifiable {
+    let id: String
+    let name: String
+    let username: String
+    let avatarName: String
+    let ethereumWallet: String?
+}
+

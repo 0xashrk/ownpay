@@ -48,8 +48,8 @@ struct SendMonForm: View {
     
     private var effectiveRecipientAddress: String {
         if sendMode == .friend, let friend = selectedFriend {
-            // In a real app, you'd get the wallet address from the friend object
-            return "0x" + friend.username.dropFirst().data(using: .utf8)!.map { String(format: "%02x", $0) }.joined()
+            // Use the actual Ethereum wallet address instead of generating a dummy one
+            return friend.ethereumWallet ?? recipientAddress
         } else {
             return recipientAddress
         }

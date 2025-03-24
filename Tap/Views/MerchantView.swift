@@ -259,15 +259,6 @@ struct MerchantView: View {
     }
 }
 
-// MARK: - Models
-
-struct Friend: Identifiable, Equatable {
-    var id: String
-    var name: String
-    var username: String
-    var avatarName: String
-}
-
 struct PaymentRequest: Identifiable {
     var id: String
     var title: String

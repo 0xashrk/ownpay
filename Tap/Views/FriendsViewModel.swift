@@ -23,7 +23,8 @@ class FriendsViewModel: ObservableObject {
                             id: profile.id,
                             name: profile.username,
                             username: "@\(profile.username)",
-                            avatarName: "person.crop.circle.fill"
+                            avatarName: "person.crop.circle.fill",
+                            ethereumWallet: profile.ethereumWallet
                         )
                     }
                     self.isLoading = false
