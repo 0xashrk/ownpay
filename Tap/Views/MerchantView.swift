@@ -20,9 +20,8 @@ struct MerchantView: View {
     
     let selectionGenerator: UISelectionFeedbackGenerator
     let bleService: BLEService?
+    @ObservedObject var viewModel: MerchantViewModel
     
-    // View Model for better separation of concerns
-    @StateObject private var viewModel = MerchantViewModel()
     @Environment(\.colorScheme) var colorScheme
     
     @State private var showingRequestFormForFriend = false
@@ -32,12 +31,14 @@ struct MerchantView: View {
          showingSendForm: Binding<Bool>,
          selectionGenerator: UISelectionFeedbackGenerator,
          isScanning: Binding<Bool> = .constant(false),
-         bleService: BLEService? = nil) {
+         bleService: BLEService? = nil,
+         viewModel: MerchantViewModel) {
         self._showingRequestForm = showingRequestForm
         self._showingSendForm = showingSendForm
         self._isScanning = isScanning
         self.selectionGenerator = selectionGenerator
         self.bleService = bleService
+        self._viewModel = ObservedObject(wrappedValue: viewModel)
     }
     
     // Theme properties
@@ -285,7 +286,8 @@ struct PaymentRequest: Identifiable {
         showingSendForm: .constant(false),
         selectionGenerator: UISelectionFeedbackGenerator(),
         isScanning: .constant(false),
-        bleService: BLEService()
+        bleService: BLEService(),
+        viewModel: MerchantViewModel()
     )
     .padding()
 }

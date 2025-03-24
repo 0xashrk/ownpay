@@ -25,6 +25,7 @@ struct WalletView: View {
     @State private var scanTimer: Timer? = nil
     @State private var currentTransactionDetails: [String: String] = [:]
     @StateObject private var paymentViewModel = PaymentViewModel()
+    @StateObject private var merchantViewModel = MerchantViewModel()
     
     // Haptic feedback generators
     private let paymentSuccessGenerator = UINotificationFeedbackGenerator()
@@ -50,7 +51,8 @@ struct WalletView: View {
                             showingSendForm: $showingSendForm,
                             selectionGenerator: selectionGenerator,
                             isScanning: $isScanning,
-                            bleService: bleService
+                            bleService: bleService,
+                            viewModel: merchantViewModel
                         )
                     } else if settingsViewModel.selectedMode == .faucet {
                         FaucetView(
@@ -116,8 +118,23 @@ struct WalletView: View {
             }
 //            Text("Hello")
             .refreshable {
-                // Refresh balance when pulling down
-                await privyService.fetchBalance()
+                // Create a task group to fetch both balance and requests concurrently
+                await withTaskGroup(of: Void.self) { group in
+                    // Fetch balance
+                    group.addTask {
+                        await privyService.fetchBalance()
+                    }
+                    
+                    // Refresh requests if in merchant mode
+                    if settingsViewModel.selectedMode == .merchant {
+                        group.addTask {
+                            await merchantViewModel.refreshRequests()
+                        }
+                    }
+                    
+                    // Wait for all tasks to complete
+                    await group.waitForAll()
+                }
             }
             .overlay {
                 if paymentViewModel.showingPaymentSuccess {
