@@ -65,6 +65,19 @@ struct UsernameResponse: Decodable {
 struct ProfileUpdateRequest: Encodable {
     let id: String
     let username: String
+    let email: String?
+    let twitter: String?
+    let solanaWallet: String?
+    let ethereumWallet: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case username
+        case email
+        case twitter
+        case solanaWallet = "solanaWallet"
+        case ethereumWallet = "ethereumWallet"
+    }
 }
 
 struct ProfileUpdateResponse: Decodable {
@@ -271,20 +284,74 @@ class APIService {
             throw APIError.notAuthenticated
         }
         
-        // Create request with both id and username
+        // Get the current auth state to extract email and wallet
+        guard case .authenticated(let session) = PrivyService.shared.authState else {
+            throw APIError.notAuthenticated
+        }
+        
+        print("Linked accounts: \(session.user.linkedAccounts)")
+        
+        // Extract email from linked accounts with logging
+        let email = session.user.linkedAccounts.first { account in
+            if case .email = account {
+                return true
+            }
+            return false
+        }.flatMap { account in
+            if case .email(let emailAccount) = account {
+                print("Found email: \(emailAccount.email)")
+                return emailAccount.email
+            }
+            return nil
+        }
+        
+        // Extract Ethereum wallet with detailed logging
+        let ethereumWallet = session.user.linkedAccounts.first { account in
+            if case .embeddedWallet(let wallet) = account {
+                print("Found wallet: \(wallet.address) of type \(wallet.chainType)")
+                return wallet.chainType == .ethereum
+            }
+            return false
+        }.flatMap { account in
+            if case .embeddedWallet(let wallet) = account {
+                print("Selected Ethereum wallet: \(wallet.address)")
+                return wallet.address
+            }
+            return nil
+        }
+        
+        // Create request with all available data
         let request = ProfileUpdateRequest(
-            id: userId, 
-            username: username
+            id: userId,
+            username: username,
+            email: email,
+            twitter: nil,
+            solanaWallet: nil,
+            ethereumWallet: ethereumWallet
         )
         
-        // Log the request for debugging
-        print("Profile update request: \(userId), \(username)")
+        // Log the complete request object
+        print("Profile update request details:")
+        print("- ID: \(userId)")
+        print("- Username: \(username)")
+        print("- Email: \(email ?? "nil")")
+        print("- Ethereum Wallet: \(ethereumWallet ?? "nil")")
+        
+        // Log the actual JSON that will be sent
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        if let jsonData = try? encoder.encode(request),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            print("\nRequest JSON:")
+            print(jsonString)
+        }
         
         // Make the API call
         let response: ProfileUpdateResponse = try await post(path: "/profile/update", body: request, requiresAuth: true)
         
-        // Log the response for debugging
-        print("Profile update response: \(response)")
+        // Log the response
+        print("\nResponse received:")
+        print(response)
         
         return response
     }

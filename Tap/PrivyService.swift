@@ -75,6 +75,8 @@ class PrivyService: ObservableObject {
                     let fullId = session.user.id
                     let userId = fullId.hasPrefix("did:privy:") ? String(fullId.dropFirst(10)) : fullId
                     print("User Privy ID: \(userId)")
+                    let sample = session.user.linkedAccounts
+                    print("Sample: \(sample) \nEnd")
                     
                     // Check if user has a wallet
                     let hasEthereumWallet = session.user.linkedAccounts.contains { account in
