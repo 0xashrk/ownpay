@@ -60,84 +60,95 @@ struct RecentRequestsView: View {
 
 struct RequestRow: View {
     let request: PaymentRequestModel
+    @State private var isShowingActions = false
     
     var body: some View {
         VStack(spacing: 0) {
-            // Main content
-            HStack(spacing: 12) {
-                // Avatar
-                Circle()
-                    .fill(Color.purple.opacity(0.1))
-                    .frame(width: 36, height: 36)
-                    .overlay(
-                        Image(systemName: "person")
-                            .foregroundColor(.purple)
-                            .font(.system(size: 14))
-                    )
-                
-                // Request details
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(request.requester?.username ?? "Unknown")
-                        .font(.system(size: 15, weight: .medium))
-                    if let note = request.note {
-                        Text(note)
-                            .font(.system(size: 13))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    }
+            // Main content becomes tappable
+            Button(action: {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    isShowingActions.toggle()
                 }
-                
-                Spacer()
-                
-                // Amount
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(request.amount.formatted()) MON")
-                        .font(.system(size: 15, weight: .semibold))
-                    Text(request.requestTimestamp, style: .relative)
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 12)
-            
-            // Action buttons
-            if request.status == .pending {
-                HStack(spacing: 1) {
-                    Button(action: { handlePayment(request) }) {
-                        HStack {
-                            Image(systemName: "checkmark")
-                            Text("Pay")
+            }) {
+                HStack(spacing: 12) {
+                    Circle()
+                        .fill(Color.purple.opacity(0.1))
+                        .frame(width: 36, height: 36)
+                        .overlay(
+                            Image(systemName: "person")
+                                .foregroundColor(.purple)
+                                .font(.system(size: 14))
+                        )
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(request.requester?.username ?? "Unknown")
+                            .font(.system(size: 15, weight: .medium))
+                        if let note = request.note {
+                            Text(note)
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
                         }
-                        .font(.system(size: 15, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color.blue.opacity(0.1))
-                        .foregroundColor(.blue)
                     }
                     
-                    Button(action: { handleReject(request) }) {
-                        HStack {
-                            Image(systemName: "xmark")
-                            Text("Reject")
-                        }
-                        .font(.system(size: 15, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color.red.opacity(0.1))
-                        .foregroundColor(.red)
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("\(request.amount.formatted()) MON")
+                            .font(.system(size: 15, weight: .semibold))
+                        Text(request.requestTimestamp, style: .relative)
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    if request.status == .pending {
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.secondary)
+                            .font(.system(size: 14))
+                            .rotationEffect(.degrees(isShowingActions ? 90 : 0))
                     }
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            // Action buttons slide down when tapped
+            if request.status == .pending && isShowingActions {
+                HStack(spacing: 0) {
+                    Button(action: { 
+                        isShowingActions = false
+                        handlePayment(request) 
+                    }) {
+                        Label("Pay", systemImage: "checkmark")
+                            .font(.system(size: 15, weight: .medium))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.blue.opacity(0.1))
+                            .foregroundColor(.blue)
+                    }
+                    
+                    Button(action: { 
+                        isShowingActions = false
+                        handleReject(request) 
+                    }) {
+                        Label("Reject", systemImage: "xmark")
+                            .font(.system(size: 15, weight: .medium))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.red.opacity(0.1))
+                            .foregroundColor(.red)
+                    }
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color(.systemGray5), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.03), radius: 3, x: 0, y: 2)
-//        .padding(.horizontal, 8)
     }
     
     private func handlePayment(_ request: PaymentRequestModel) {
