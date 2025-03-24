@@ -39,7 +39,7 @@ struct RecentRequestsView: View {
                 ProgressView()
                     .frame(maxWidth: .infinity)
             } else if viewModel.recentRequests.isEmpty {
-                Text("No recent requests")
+                Text("No pending requests")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -48,7 +48,7 @@ struct RecentRequestsView: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(spacing: 12) {
                         ForEach(viewModel.recentRequests, id: \.id) { request in
-                            RequestRow(request: request)
+                            RequestRow(request: request, viewModel: viewModel)
                         }
                     }
 //                    .padding(.horizontal)
@@ -60,7 +60,9 @@ struct RecentRequestsView: View {
 
 struct RequestRow: View {
     let request: PaymentRequestModel
+    @ObservedObject var viewModel: MerchantViewModel
     @State private var isShowingActions = false
+    @State private var isRemoving = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -149,6 +151,8 @@ struct RequestRow: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color(.systemGray5), lineWidth: 1)
         )
+        .opacity(isRemoving ? 0 : 1)
+        .animation(.easeOut(duration: 0.2), value: isRemoving)
     }
     
     private func handlePayment(_ request: PaymentRequestModel) {
@@ -165,18 +169,37 @@ struct RequestRow: View {
     private func handleReject(_ request: PaymentRequestModel) {
         Task {
             do {
-                // Pass the request.id (UUID) to the reject endpoint
+                // First, trigger the fade-out animation
+                withAnimation {
+                    isShowingActions = false
+                }
+                
+                // Wait for the actions to hide
+                try await Task.sleep(for: .milliseconds(200))
+                
+                // Start the removal animation
+                withAnimation {
+                    isRemoving = true
+                }
+                
+                // Wait for the fade-out to complete
+                try await Task.sleep(for: .milliseconds(200))
+                
+                // Make the API call
                 try await APIService.shared.rejectPaymentRequest(requestId: request.id.uuidString)
                 print("Successfully rejected request: \(request.id)")
                 
-                // Here you might want to:
-                // 1. Update the UI to show the rejection
-                // 2. Refresh the requests list
-                // 3. Show a success message
+                // Update the UI after everything is done
+                await MainActor.run {
+                    viewModel.refreshRequests()
+                }
                 
             } catch {
-                print("Error rejecting request: \(error)")
-                // Handle error (e.g., show error alert)
+                // If there's an error, restore the view
+                await MainActor.run {
+                    isRemoving = false
+                    print("Error rejecting request: \(error)")
+                }
             }
         }
     }

@@ -21,7 +21,8 @@ class MerchantViewModel: ObservableObject {
             do {
                 let requests = try await APIService.shared.getReceivedPaymentRequests()
                 await MainActor.run {
-                    self.recentRequests = requests
+                    // Filter to only show pending requests
+                    self.recentRequests = requests.filter { $0.status == .pending }
                     self.isLoading = false
                 }
             } catch {
@@ -29,6 +30,22 @@ class MerchantViewModel: ObservableObject {
                     self.error = error
                     self.isLoading = false
                 }
+            }
+        }
+    }
+    
+    // Add a function to refresh requests after actions
+    func refreshRequests() {
+        Task {
+            do {
+                let requests = try await APIService.shared.getReceivedPaymentRequests()
+                await MainActor.run {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        self.recentRequests = requests.filter { $0.status == .pending }
+                    }
+                }
+            } catch {
+                print("Error refreshing requests: \(error)")
             }
         }
     }
