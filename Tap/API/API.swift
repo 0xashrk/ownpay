@@ -104,6 +104,11 @@ struct UsernameAvailabilityResponse: Decodable {
     let taken: Bool
 }
 
+// Add this near other request/response models
+struct RejectPaymentRequestBody: Encodable {
+    let request_id: String
+}
+
 // MARK: - API Service
 class APIService {
     static let shared = APIService()
@@ -458,6 +463,40 @@ class APIService {
         }
         
         return try JSONDecoder().decode([PaymentRequestModel].self, from: data)
+    }
+    
+    // Add this method to APIService class
+    func rejectPaymentRequest(requestId: String) async throws -> EmptyResponse {
+        guard let url = URL(string: "\(P2P_BASE_URL)/p2p/payment-request/reject") else {
+            throw APIError.invalidURL
+        }
+        
+        let requestBody = RejectPaymentRequestBody(request_id: requestId)
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // Add JWT token
+        if let token = getAuthToken() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        // Encode request body
+        let encoder = JSONEncoder()
+        request.httpBody = try encoder.encode(requestBody)
+        
+        let (data, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw APIError.serverError(httpResponse.statusCode, String(data: data, encoding: .utf8) ?? "Unknown error")
+        }
+        
+        return try JSONDecoder().decode(EmptyResponse.self, from: data)
     }
 }
 

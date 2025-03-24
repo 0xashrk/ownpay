@@ -165,10 +165,18 @@ struct RequestRow: View {
     private func handleReject(_ request: PaymentRequestModel) {
         Task {
             do {
-                // TODO: Implement reject logic
-                print("Rejecting request: \(request.id)")
+                // Pass the request.id (UUID) to the reject endpoint
+                try await APIService.shared.rejectPaymentRequest(requestId: request.id.uuidString)
+                print("Successfully rejected request: \(request.id)")
+                
+                // Here you might want to:
+                // 1. Update the UI to show the rejection
+                // 2. Refresh the requests list
+                // 3. Show a success message
+                
             } catch {
                 print("Error rejecting request: \(error)")
+                // Handle error (e.g., show error alert)
             }
         }
     }
