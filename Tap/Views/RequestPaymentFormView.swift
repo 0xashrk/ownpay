@@ -55,6 +55,31 @@ struct RequestPaymentFormView: View, Hashable {
         }
     }
     
+    // Add this computed property to format and validate input
+    private var formattedAmount: Binding<String> {
+        Binding(
+            get: { viewModel.amount },
+            set: { newValue in
+                // Only allow numbers and one decimal point
+                let filtered = newValue.filter { "0123456789.".contains($0) }
+                
+                // Handle decimal places
+                if filtered.contains(".") {
+                    let components = filtered.split(separator: ".")
+                    if components.count == 2 {
+                        // Limit to 2 decimal places
+                        let decimals = String(components[1].prefix(2))
+                        viewModel.amount = "\(components[0]).\(decimals)"
+                    } else {
+                        viewModel.amount = filtered
+                    }
+                } else {
+                    viewModel.amount = filtered
+                }
+            }
+        )
+    }
+    
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -63,9 +88,9 @@ struct RequestPaymentFormView: View, Hashable {
                         .font(.headline)
                         .foregroundColor(.secondary)
                     
-                    TextField("Amount (MON)", text: $viewModel.amount)
+                    TextField("Amount (MON)", text: formattedAmount)
                         .padding()
-                        .keyboardType(.decimalPad) // Add decimal keyboard
+                        .keyboardType(.decimalPad)
                         .background(Color.gray.opacity(0.1))
                         .cornerRadius(10)
                     
@@ -79,7 +104,7 @@ struct RequestPaymentFormView: View, Hashable {
                             Button(action: {
                                 viewModel.setQuickPaymentAmount(amount)
                             }) {
-                                Text(String(format: "%.3f", amount))
+                                Text(String(format: "%.2f", amount))
                                     .font(.system(.body, design: .monospaced))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
@@ -91,7 +116,7 @@ struct RequestPaymentFormView: View, Hashable {
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 10)
                                             .stroke(Color.blue, lineWidth: 1)
-                                        )
+                                    )
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
