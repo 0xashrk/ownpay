@@ -115,7 +115,6 @@ struct MerchantView: View {
             }
         }
         .onAppear {
-            viewModel.loadFriends()
             viewModel.loadRecentRequests()
         }
     }
