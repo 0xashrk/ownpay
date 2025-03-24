@@ -69,10 +69,25 @@ struct MerchantView: View {
                 ) { friend in
                     let destination = RequestPaymentFormView(
                         amount: .constant(""),
-                        selectedFriend: friend
-                    ) { amount, note in
-                        viewModel.showingFriendPicker = false
-                    }
+                        selectedFriend: friend,
+                        onRequest: { amount, note in
+                            // Call the API to create payment request
+                            Task {
+                                do {
+                                    _ = try await APIService.shared.createPaymentRequest(
+                                        friendId: friend.id,
+                                        amount: amount,
+                                        note: note
+                                    )
+                                    await MainActor.run {
+                                        viewModel.showingFriendPicker = false
+                                    }
+                                } catch {
+                                    print("Error creating payment request: \(error)")
+                                }
+                            }
+                        }
+                    )
                     viewModel.navigationPath.append(destination)
                 }
                 .navigationDestination(for: RequestPaymentFormView.self) { view in
