@@ -158,10 +158,60 @@ struct RequestRow: View {
     private func handlePayment(_ request: PaymentRequestModel) {
         Task {
             do {
-                // TODO: Implement payment logic
-                print("Processing payment for request: \(request.id)")
+                // First, trigger the fade-out animation
+                withAnimation {
+                    isShowingActions = false
+                }
+                
+                // Wait for the actions to hide
+                try await Task.sleep(for: .milliseconds(200))
+                
+                // Start the removal animation
+                withAnimation {
+                    isRemoving = true
+                }
+                
+                // Wait for the fade-out to complete
+                try await Task.sleep(for: .milliseconds(200))
+                
+                // Get the requester's ethereum wallet address
+                guard let requesterWallet = request.requester?.ethereumWallet else {
+                    throw APIError.invalidResponse
+                }
+                
+                // Send the blockchain transaction and get the actual transaction hash
+                let transactionHash = try await PrivyService.shared.sendTransaction(
+                    amount: NSDecimalNumber(decimal: request.amount).doubleValue,
+                    to: requesterWallet
+                )
+                
+                print("Transaction successful with hash: \(transactionHash)")
+                
+                // Update the payment request status with the actual blockchain transaction hash
+                try await APIService.shared.payPaymentRequest(
+                    requestId: request.id.uuidString,
+                    transactionHash: transactionHash  // This will now be the real hash from the blockchain
+                )
+                
+                print("Successfully paid request: \(request.id) with transaction: \(transactionHash)")
+                
+                // Update the UI after everything is done
+                await MainActor.run {
+                    // Refresh the requests list
+                    viewModel.refreshRequests()
+                    
+                    // Refresh the wallet balance
+                    Task {
+                        await PrivyService.shared.fetchBalance()
+                    }
+                }
+                
             } catch {
-                print("Error processing payment: \(error)")
+                // If there's an error, restore the view
+                await MainActor.run {
+                    isRemoving = false
+                    print("Error paying request: \(error)")
+                }
             }
         }
     }

@@ -437,7 +437,7 @@ class PrivyService: ObservableObject {
     }
     
     @MainActor
-    func sendTransaction(amount: Double, to recipientAddress: String) async throws {
+    func sendTransaction(amount: Double, to recipientAddress: String) async throws -> String {
         guard case .connected(let wallets) = privy.embeddedWallet.embeddedWalletState else {
             print("Wallet not connected")
             throw WalletError.providerNotInitialized
@@ -458,21 +458,20 @@ class PrivyService: ObservableObject {
             // Convert amount to wei (1 MON = 1e18 wei)
             let amountInWei = UInt64(amount * 1e18)
             
-            // Create transaction with EIP-1559 gas parameters (much higher)
+            // Create transaction with EIP-1559 gas parameters
             let tx: [String: Any] = [
                 "from": wallet.address,
                 "to": recipientAddress,
                 "value": toHexString(amountInWei),
                 "chainId": "0x279f",
                 "gas": toHexString(21000),
-                "maxFeePerGas": toHexString(500000000000),         // 500 Gwei (10x previous)
-                "maxPriorityFeePerGas": toHexString(20000000000),  // 20 Gwei (10x previous)
+                "maxFeePerGas": toHexString(500000000000),
+                "maxPriorityFeePerGas": toHexString(20000000000),
                 "nonce": nonce
             ]
             
             print("Preparing transaction: \(tx)")
             
-            // Convert transaction to JSON string
             let txData = try JSONSerialization.data(withJSONObject: tx)
             let txString = String(data: txData, encoding: .utf8)!
             
@@ -490,13 +489,15 @@ class PrivyService: ObservableObject {
             
             print("Transaction signed successfully: \(signedTxString)")
             
-            // Send the raw transaction directly to our RPC endpoint
+            // Send the raw transaction and get the transaction hash
             let txHash = try await sendRawTransaction(signedTx: signedTxString)
-            print("Transaction submitted: \(txHash)")
+            print("Transaction submitted with hash: \(txHash)")
             
             // Wait for transaction confirmation
             try await Task.sleep(nanoseconds: 3 * 1_000_000_000) // 3 seconds
             await fetchBalance()
+            
+            return txHash // Return the actual transaction hash
         } catch {
             print("Error sending transaction: \(error)")
             throw error
