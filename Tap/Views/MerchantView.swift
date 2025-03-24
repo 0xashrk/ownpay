@@ -56,8 +56,8 @@ struct MerchantView: View {
                 // Main action cards
                 actionCardsSection
                 
-                // Recent requests
-                recentRequestsSection
+                // Recent requests using new view
+                RecentRequestsView(viewModel: viewModel)
             }
             .padding(.horizontal)
         }
@@ -74,9 +74,11 @@ struct MerchantView: View {
                             // Call the API to create payment request
                             Task {
                                 do {
+                                    // Convert Double to Decimal
+                                    let decimalAmount = Decimal(amount)
                                     _ = try await APIService.shared.createPaymentRequest(
                                         friendId: friend.id,
-                                        amount: amount,
+                                        amount: decimalAmount,  // Now passing Decimal
                                         note: note
                                     )
                                     await MainActor.run {
@@ -114,6 +116,7 @@ struct MerchantView: View {
         }
         .onAppear {
             viewModel.loadFriends()
+            viewModel.loadRecentRequests()
         }
     }
     
@@ -251,166 +254,6 @@ struct MerchantView: View {
             .cornerRadius(12)
         }
         .buttonStyle(PlainButtonStyle())
-    }
-    
-    private var recentRequestsSection: some View {
-        VStack(spacing: 12) {
-            // Header with expand/collapse button
-            Button(action: {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    viewModel.isRecentRequestsExpanded.toggle()
-                }
-            }) {
-                HStack {
-                    Text("Recent Requests")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    if viewModel.isLoading {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                            .padding(.leading, 4)
-                    }
-                    
-                    Spacer()
-                    
-                    Image(systemName: viewModel.isRecentRequestsExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 14))
-                        .foregroundColor(.secondary)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(PlainButtonStyle())
-            
-            if viewModel.isRecentRequestsExpanded {
-                if viewModel.isLoading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                } else if let error = viewModel.error {
-                    Text(error.localizedDescription)
-                        .foregroundColor(.red)
-                        .padding()
-                } else if viewModel.recentRequests.isEmpty {
-                    emptyRequestsView
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                } else {
-                    ForEach(viewModel.recentRequests, id: \.id) { request in
-                        requestRow(request: request)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
-                }
-            }
-        }
-        .padding(.top)
-        .onAppear {
-            viewModel.loadRecentRequests()
-        }
-    }
-    
-    private var emptyRequestsView: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "tray")
-                .font(.system(size: 40))
-                .foregroundColor(.secondary.opacity(0.5))
-                .padding()
-            
-            Text("No recent requests")
-                .font(.headline)
-                .foregroundColor(.secondary)
-            
-            Text("Your recent payment requests will appear here")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 30)
-        .background(surfaceColor)
-        .cornerRadius(12)
-    }
-    
-    private func requestRow(request: PaymentRequestModel) -> some View {
-        VStack(spacing: 12) {
-            // Top section with user and amount
-            HStack(spacing: 12) {
-                // Avatar/Icon
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.system(size: 36))
-                    .foregroundColor(secondaryColor)
-                
-                // Details
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(request.requester?.username ?? "Unknown")
-                        .font(.headline)
-                    
-                    if let note = request.note {
-                        Text(note)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Text(request.requestTimestamp, style: .relative)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                // Amount
-                Text("\(request.amount.formatted()) MON")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-            }
-            
-            // Bottom section with buttons
-            HStack(spacing: 12) {
-                // Pay Button
-                Button(action: {
-                    // TODO: Implement pay action
-                }) {
-                    Text("Pay")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
-                }
-                
-                // Reject Button
-                Button(action: {
-                    // TODO: Implement reject action
-                }) {
-                    Text("Reject")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(Color.red)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
-                }
-            }
-            .padding(.top, 8)
-        }
-        .padding()
-        .background(surfaceColor)
-        .cornerRadius(12)
-    }
-    
-    private func statusColor(for status: PaymentRequestModel.RequestStatus) -> Color {
-        switch status {
-        case .pending:
-            return .orange
-        case .approved:
-            return .green
-        case .rejected:
-            return .red
-        case .expired:
-            return .gray
-        }
     }
 }
 
