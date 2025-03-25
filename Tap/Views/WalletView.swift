@@ -71,8 +71,7 @@ struct WalletView: View {
                     }
                     
                     // Payment Requests (visible to customer or faucet)
-                    if settingsViewModel.selectedMode != .merchant,
-                       let message = bleService.receivedMessage,
+                    if let message = bleService.receivedMessage,
                        !paymentViewModel.hasProcessedRequest(message) {
                         
                         PaymentRequestCard(
@@ -179,18 +178,9 @@ struct WalletView: View {
                 scanTimer?.invalidate()
                 scanTimer = nil
                 
-                if newValue == .merchant {
-                    // Merchant mode: stop scanning
-                    bleService.stopScanning()
-                    bleService.stopAdvertising() // Stop any previous advertising
-                } else {
-                    // Customer or Faucet mode: start scanning, stop advertising
-                    bleService.stopAdvertising()
-                    bleService.startScanning()
-                    
-                    // Start periodic scanning in customer/faucet mode
-                    setupAutoScan()
-                }
+                bleService.stopAdvertising()
+                bleService.startScanning()
+                setupAutoScan()
             }
             .onAppear {
                 // Fetch balance with retry when view appears
