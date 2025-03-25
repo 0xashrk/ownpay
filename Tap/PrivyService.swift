@@ -625,4 +625,39 @@ class PrivyService: ObservableObject {
             self.embeddedWalletState = .notConnected
         }
     }
+    
+    @MainActor
+    func refreshToken() async throws {
+        print("Attempting to refresh token...")
+        
+        // First check if we're already authenticated
+        guard case .authenticated = authState else {
+            print("Not authenticated, cannot refresh token")
+            throw APIError.notAuthenticated
+        }
+        
+        // Force a re-authentication using the existing session
+        do {
+            // Re-initialize the SDK to force a new token
+            let config = PrivyConfig(appId: Config.privyAppId, appClientId: Config.privyClientId)
+            privy = PrivySdk.initialize(config: config)
+            
+            // Wait for the new auth state
+            for _ in 0..<10 { // Try for up to 5 seconds
+                if case .authenticated(let session) = authState {
+                    self.accessToken = session.authToken
+                    print("Successfully refreshed token")
+                    return
+                }
+                try await Task.sleep(nanoseconds: 500_000_000) // 500ms
+            }
+            
+            throw APIError.tokenExpired
+        } catch {
+            print("Failed to refresh token: \(error)")
+            // If refresh fails, log out the user
+            try await logout()
+            throw APIError.tokenExpired
+        }
+    }
 }

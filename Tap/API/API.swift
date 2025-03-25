@@ -126,6 +126,9 @@ class APIService {
     
     private let P2P_BASE_URL = "http://127.0.0.1:8000"
     
+    // Add this property to APIService
+    private var isRefreshingToken = false
+    
     private init() {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30 // 30 seconds timeout
@@ -233,24 +236,34 @@ class APIService {
                     throw APIError.decodingFailed(error)
                 }
                 
-            case 401:
-                // Unauthorized
-                if let responseString = String(data: data, encoding: .utf8),
-                   responseString.contains("Token has expired") && retry < maxRetries {
-                    // Token expired - notify token refresh system
-                    tokenRetrySubject.send()
+            case 401, 403:
+                // Token expired or unauthorized
+                if retry < maxRetries && !isRefreshingToken {
+                    isRefreshingToken = true
                     
-                    // Wait a bit for potential token refresh
-                    try await Task.sleep(for: .seconds(1))
-                    
-                    // Retry the request
-                    return try await performRequest(path: path, method: method, body: body, requiresAuth: requiresAuth, retry: retry + 1, maxRetries: maxRetries)
+                    // Attempt to refresh the token
+                    do {
+                        // Get a new token from PrivyService
+                        try await PrivyService.shared.refreshToken()
+                        
+                        // Reset the refreshing flag
+                        isRefreshingToken = false
+                        
+                        // Retry the request with the new token
+                        return try await performRequest(
+                            path: path,
+                            method: method,
+                            body: body,
+                            requiresAuth: requiresAuth,
+                            retry: retry + 1,
+                            maxRetries: maxRetries
+                        )
+                    } catch {
+                        isRefreshingToken = false
+                        throw APIError.unauthorized
+                    }
                 }
                 
-                throw APIError.unauthorized
-                
-            case 403:
-                // Forbidden
                 throw APIError.unauthorized
                 
             default:
