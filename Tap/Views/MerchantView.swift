@@ -59,6 +59,12 @@ struct MerchantView: View {
                 
                 // Recent requests using new view
                 RecentRequestsView(viewModel: viewModel)
+                
+                // Add a spacer that takes up remaining space when payment card is shown
+                if bleService?.receivedMessage != nil {
+                    Spacer()
+                        .frame(height: UIScreen.main.bounds.height / 3) // Adjust this value to control vertical position
+                }
             }
             .padding(.horizontal)
         }

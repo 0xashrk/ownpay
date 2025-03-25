@@ -70,52 +70,35 @@ struct WalletView: View {
                         )
                     }
                     
-                    // Payment Requests (visible to customer or faucet)
-                    if let message = bleService.receivedMessage,
-                       !paymentViewModel.hasProcessedRequest(message) {
-                        
-                        PaymentRequestCard(
-                            message: message,
-                            bleService: bleService,
-                            settingsViewModel: settingsViewModel,
-                            onPaymentAction: { approved in
-                                _ = paymentViewModel.processPaymentRequest(
-                                    message: message,
-                                    approved: approved,
-                                    modelContext: modelContext,
-                                    privyService: privyService,
-                                    bleService: bleService,
-                                    settingsViewModel: settingsViewModel,
-                                    playSound: playPaymentSound
-                                )
-                            }
-                        )
-                        .padding(.horizontal)
-                    }
-                    
-                    // Payment Responses (visible to merchant)
-                    if settingsViewModel.selectedMode == .merchant,
-                       let message = bleService.receivedMessage,
-                       message.starts(with: "PAYMENT_RESPONSE:") {
-                        
-                        PaymentResponseCard(message: message)
-                            .padding(.horizontal)
-                            .onAppear {
-                                paymentViewModel.processPaymentResponse(
-                                    message: message,
-                                    bleService: bleService,
-                                    fetchBalance: { fetchBalanceWithRetry() },
-                                    playSound: playPaymentSound
-                                )
-                            }
-                    }
+                    Text("Created by own.fun")
+                        .foregroundStyle(Color.secondary)
+                        .font(.caption)
                 }
                 .padding(.vertical)
-                Text("Created by own.fun")
-                    .foregroundStyle(Color.secondary)
-                    .font(.caption)
             }
-//            Text("Hello")
+            .overlay {
+                if let message = bleService.receivedMessage,
+                   !paymentViewModel.hasProcessedRequest(message) {
+                    
+                    PaymentRequestCard(
+                        message: message,
+                        bleService: bleService,
+                        settingsViewModel: settingsViewModel,
+                        onPaymentAction: { approved in
+                            _ = paymentViewModel.processPaymentRequest(
+                                message: message,
+                                approved: approved,
+                                modelContext: modelContext,
+                                privyService: privyService,
+                                bleService: bleService,
+                                settingsViewModel: settingsViewModel,
+                                playSound: playPaymentSound
+                            )
+                        }
+                    )
+                    .padding(.horizontal)
+                }
+            }
             .refreshable {
                 // Create a task group to fetch both balance and requests concurrently
                 await withTaskGroup(of: Void.self) { group in
