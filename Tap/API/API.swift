@@ -227,7 +227,6 @@ class APIService {
             // Handle response status
             switch httpResponse.statusCode {
             case 200...299:
-                // Success!
                 do {
                     return try JSONDecoder().decode(T.self, from: data)
                 } catch {
@@ -237,37 +236,36 @@ class APIService {
                 }
                 
             case 401, 403:
-                // Token expired or unauthorized
-                if retry < maxRetries && !isRefreshingToken {
-                    isRefreshingToken = true
+                // Check if it's a token expiration
+                if let responseString = String(data: data, encoding: .utf8),
+                   responseString.contains("Token has expired") {
                     
-                    // Attempt to refresh the token
-                    do {
-                        // Get a new token from PrivyService
-                        try await PrivyService.shared.refreshToken()
+                    if retry < maxRetries {
+                        print("Token expired, attempting to refresh...")
                         
-                        // Reset the refreshing flag
-                        isRefreshingToken = false
-                        
-                        // Retry the request with the new token
-                        return try await performRequest(
-                            path: path,
-                            method: method,
-                            body: body,
-                            requiresAuth: requiresAuth,
-                            retry: retry + 1,
-                            maxRetries: maxRetries
-                        )
-                    } catch {
-                        isRefreshingToken = false
-                        throw APIError.unauthorized
+                        do {
+                            // Attempt to refresh the token using PrivyService
+                            try await PrivyService.shared.refreshToken()
+                            
+                            // Retry the request with the new token
+                            return try await performRequest(
+                                path: path,
+                                method: method,
+                                body: body,
+                                requiresAuth: requiresAuth,
+                                retry: retry + 1,
+                                maxRetries: maxRetries
+                            )
+                        } catch {
+                            print("Token refresh failed: \(error)")
+                            throw APIError.tokenExpired
+                        }
                     }
                 }
                 
                 throw APIError.unauthorized
                 
             default:
-                // Other error
                 let message = String(data: data, encoding: .utf8) ?? "Unknown error"
                 throw APIError.serverError(httpResponse.statusCode, message)
             }

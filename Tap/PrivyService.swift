@@ -636,22 +636,26 @@ class PrivyService: ObservableObject {
             throw APIError.notAuthenticated
         }
         
-        // Force a re-authentication using the existing session
         do {
             // Re-initialize the SDK to force a new token
             let config = PrivyConfig(appId: Config.privyAppId, appClientId: Config.privyClientId)
             privy = PrivySdk.initialize(config: config)
             
-            // Wait for the new auth state
-            for _ in 0..<10 { // Try for up to 5 seconds
+            // Wait for the new auth state with timeout
+            let startTime = Date()
+            while Date().timeIntervalSince(startTime) < 5.0 { // 5 second timeout
                 if case .authenticated(let session) = authState {
                     self.accessToken = session.authToken
-                    print("Successfully refreshed token")
+                    print("Successfully refreshed token: \(session.authToken)")
+                    
+                    // Force a balance refresh after token update
+                    await fetchBalance()
                     return
                 }
                 try await Task.sleep(nanoseconds: 500_000_000) // 500ms
             }
             
+            print("Token refresh timed out")
             throw APIError.tokenExpired
         } catch {
             print("Failed to refresh token: \(error)")
