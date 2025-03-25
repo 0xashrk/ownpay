@@ -124,7 +124,7 @@ class APIService {
     private let tokenRetrySubject = PassthroughSubject<Void, Never>()
     private var tokenRetrySubscription: AnyCancellable?
     
-    private let P2P_BASE_URL = "http://127.0.0.1:8000"
+    private let P2P_BASE_URL = "https://payments-prod-gpg2ezhkdhatchd9.westeurope-01.azurewebsites.net"
     
     // Add this property to APIService
     private var isRefreshingToken = false

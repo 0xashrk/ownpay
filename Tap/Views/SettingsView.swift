@@ -105,37 +105,37 @@ struct SettingsView: View {
                 }
             }
             
-            Section(header: Text("SETTINGS").foregroundColor(.gray).font(.caption)) {
-                // Display current wallet mode
-                HStack {
-                    Image(systemName: viewModel.iconForMode(viewModel.selectedMode))
-                        .foregroundColor(.blue)
-                        .frame(width: 30)
-                    
-                    Text("Current Mode: \(viewModel.titleForMode(viewModel.selectedMode))")
-                    
-                    Spacer()
-                }
-                
-                // Simple button that shows password prompt
-                Button(action: {
-                    viewModel.showingPasswordPrompt = true
-                }) {
-                    HStack {
-                        Image(systemName: "lock.shield")
-                            .foregroundColor(.blue)
-                            .frame(width: 30)
-                        
-                        Text("Change Wallet Mode")
-                        
-                        Spacer()
-                        
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(.gray)
-                            .font(.caption)
-                    }
-                }
-            }
+//            Section(header: Text("SETTINGS").foregroundColor(.gray).font(.caption)) {
+//                // Display current wallet mode
+//                HStack {
+//                    Image(systemName: viewModel.iconForMode(viewModel.selectedMode))
+//                        .foregroundColor(.blue)
+//                        .frame(width: 30)
+//                    
+//                    Text("Current Mode: \(viewModel.titleForMode(viewModel.selectedMode))")
+//                    
+//                    Spacer()
+//                }
+//                
+//                // Simple button that shows password prompt
+//                Button(action: {
+//                    viewModel.showingPasswordPrompt = true
+//                }) {
+//                    HStack {
+//                        Image(systemName: "lock.shield")
+//                            .foregroundColor(.blue)
+//                            .frame(width: 30)
+//                        
+//                        Text("Change Wallet Mode")
+//                        
+//                        Spacer()
+//                        
+//                        Image(systemName: "chevron.right")
+//                            .foregroundColor(.gray)
+//                            .font(.caption)
+//                    }
+//                }
+//            }
             
 //            Section(header: Text("API Connection Test")) {
 //                Button(action: {
