@@ -168,7 +168,9 @@ class APIService {
     }
     
     private func buildRequest(for path: String, method: String, body: Data? = nil, requiresAuth: Bool = true) throws -> URLRequest {
-        guard let url = URL(string: "\(environment.baseURL)\(path)") else {
+        // Handle both full URLs and relative paths
+        let urlString = path.hasPrefix("http") ? path : "\(environment.baseURL)\(path)"
+        guard let url = URL(string: urlString) else {
             throw APIError.invalidURL
         }
         
@@ -370,177 +372,41 @@ class APIService {
     
     // Update the getUserProfiles method to be clean and consistent
     func getUserProfiles() async throws -> [UserProfile] {
-        guard let url = URL(string: "\(P2P_BASE_URL)/p2p/user-profiles") else {
-            throw APIError.invalidURL
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        if let token = getAuthToken() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
-        let (data, response) = try await session.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-        
-        guard httpResponse.statusCode == 200 else {
-            throw APIError.serverError(httpResponse.statusCode, String(data: data, encoding: .utf8) ?? "Unknown error")
-        }
-        
-        return try JSONDecoder().decode([UserProfile].self, from: data)
+        // Use the performRequest method instead of creating a new URLRequest
+        let fullPath = "\(P2P_BASE_URL)/p2p/user-profiles"
+        return try await performRequest(path: fullPath, method: "GET", requiresAuth: true)
     }
     
     func createPaymentRequest(friendId: String, amount: Decimal, note: String? = nil) async throws -> PaymentRequestResponse {
-        guard let url = URL(string: "\(P2P_BASE_URL)/p2p/payment-request") else {
-            throw APIError.invalidURL
-        }
-        
+        let fullPath = "\(P2P_BASE_URL)/p2p/payment-request"
         let requestBody = CreatePaymentRequestBody(
             friendId: friendId,
             amount: amount,
             note: note
         )
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        // Add JWT token
-        if let token = getAuthToken() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
-        // Encode request body
-        let encoder = JSONEncoder()
-        request.httpBody = try encoder.encode(requestBody)
-        
-        let (data, response) = try await session.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-        
-        guard httpResponse.statusCode == 200 else {
-            throw APIError.serverError(httpResponse.statusCode, String(data: data, encoding: .utf8) ?? "Unknown error")
-        }
-        
-        return try JSONDecoder().decode(PaymentRequestResponse.self, from: data)
+        return try await post(path: fullPath, body: requestBody, requiresAuth: true)
     }
     
     func getReceivedPaymentRequests() async throws -> [PaymentRequestModel] {
-        guard let url = URL(string: "\(P2P_BASE_URL)/p2p/payment-requests/received") else {
-            throw APIError.invalidURL
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        if let token = getAuthToken() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
-        let (data, response) = try await session.data(for: request)
-        
-        // Print the raw JSON response
-        if let jsonString = String(data: data, encoding: .utf8) {
-            print("Received Payment Requests JSON Response:")
-            print(jsonString)
-            
-            // Pretty print JSON for better readability
-            if let jsonObject = try? JSONSerialization.jsonObject(with: data),
-               let prettyData = try? JSONSerialization.data(withJSONObject: jsonObject, options: .prettyPrinted),
-               let prettyString = String(data: prettyData, encoding: .utf8) {
-                print("\nPretty Printed JSON:")
-                print(prettyString)
-            }
-        }
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-        
-        guard httpResponse.statusCode == 200 else {
-            throw APIError.serverError(httpResponse.statusCode, String(data: data, encoding: .utf8) ?? "Unknown error")
-        }
-        
-        return try JSONDecoder().decode([PaymentRequestModel].self, from: data)
+        let fullPath = "\(P2P_BASE_URL)/p2p/payment-requests/received"
+        return try await performRequest(path: fullPath, method: "GET", requiresAuth: true)
     }
     
     // Add this method to APIService class
     func rejectPaymentRequest(requestId: String) async throws -> EmptyResponse {
-        guard let url = URL(string: "\(P2P_BASE_URL)/p2p/payment-request/reject") else {
-            throw APIError.invalidURL
-        }
-        
+        let fullPath = "\(P2P_BASE_URL)/p2p/payment-request/reject"
         let requestBody = RejectPaymentRequestBody(request_id: requestId)
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        // Add JWT token
-        if let token = getAuthToken() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
-        // Encode request body
-        let encoder = JSONEncoder()
-        request.httpBody = try encoder.encode(requestBody)
-        
-        let (data, response) = try await session.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-        
-        guard httpResponse.statusCode == 200 else {
-            throw APIError.serverError(httpResponse.statusCode, String(data: data, encoding: .utf8) ?? "Unknown error")
-        }
-        
-        return try JSONDecoder().decode(EmptyResponse.self, from: data)
+        return try await post(path: fullPath, body: requestBody, requiresAuth: true)
     }
     
     // Add this method to APIService class
     func payPaymentRequest(requestId: String, transactionHash: String) async throws -> EmptyResponse {
-        guard let url = URL(string: "\(P2P_BASE_URL)/p2p/payment-request/pay") else {
-            throw APIError.invalidURL
-        }
-        
+        let fullPath = "\(P2P_BASE_URL)/p2p/payment-request/pay"
         let requestBody = PayPaymentRequestBody(
             request_id: requestId,
             transaction_hash: transactionHash
         )
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        // Add JWT token
-        if let token = getAuthToken() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
-        // Encode request body
-        let encoder = JSONEncoder()
-        request.httpBody = try encoder.encode(requestBody)
-        
-        let (data, response) = try await session.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-        
-        guard httpResponse.statusCode == 200 else {
-            throw APIError.serverError(httpResponse.statusCode, String(data: data, encoding: .utf8) ?? "Unknown error")
-        }
-        
-        return try JSONDecoder().decode(EmptyResponse.self, from: data)
+        return try await post(path: fullPath, body: requestBody, requiresAuth: true)
     }
 }
 
