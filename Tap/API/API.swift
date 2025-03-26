@@ -217,21 +217,19 @@ class APIService {
     private func performRequest<T: Decodable>(path: String, method: String, body: Data? = nil, requiresAuth: Bool = true, retry: Int = 0, maxRetries: Int = 1) async throws -> T {
         do {
             let request = try buildRequest(for: path, method: method, body: body, requiresAuth: requiresAuth)
-            
             let (data, response) = try await session.data(for: request)
             
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw APIError.invalidResponse
             }
             
-            // Handle response status
             switch httpResponse.statusCode {
             case 200...299:
                 do {
                     return try JSONDecoder().decode(T.self, from: data)
                 } catch {
-                    print("Decoding error: \(error)")
-                    print("Response data: \(String(data: data, encoding: .utf8) ?? "Invalid data")")
+                    print("API: Decoding error: \(error)")
+                    print("API: Response data: \(String(data: data, encoding: .utf8) ?? "Invalid data")")
                     throw APIError.decodingFailed(error)
                 }
                 
@@ -241,39 +239,31 @@ class APIService {
                    responseString.contains("Token has expired") {
                     
                     if retry < maxRetries {
-                        print("Token expired, attempting to refresh...")
+                        print("API: Token expired, attempting refresh...")
                         
-                        do {
-                            // Attempt to refresh the token using PrivyService
-                            try await PrivyService.shared.refreshToken()
-                            
-                            // Retry the request with the new token
-                            return try await performRequest(
-                                path: path,
-                                method: method,
-                                body: body,
-                                requiresAuth: requiresAuth,
-                                retry: retry + 1,
-                                maxRetries: maxRetries
-                            )
-                        } catch {
-                            print("Token refresh failed: \(error)")
-                            throw APIError.tokenExpired
-                        }
+                        // Get new token from PrivyService
+                        let newToken = try await PrivyService.shared.refreshToken()
+                        
+                        print("API: Got new token, retrying request...")
+                        // Retry the request with new token
+                        return try await performRequest(
+                            path: path,
+                            method: method,
+                            body: body,
+                            requiresAuth: requiresAuth,
+                            retry: retry + 1,
+                            maxRetries: maxRetries
+                        )
                     }
                 }
-                
                 throw APIError.unauthorized
                 
             default:
                 let message = String(data: data, encoding: .utf8) ?? "Unknown error"
                 throw APIError.serverError(httpResponse.statusCode, message)
             }
-            
-        } catch let error as APIError {
-            throw error
         } catch {
-            throw APIError.requestFailed(error)
+            throw error
         }
     }
     

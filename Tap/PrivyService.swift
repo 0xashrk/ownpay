@@ -627,41 +627,30 @@ class PrivyService: ObservableObject {
     }
     
     @MainActor
-    func refreshToken() async throws {
-        print("Attempting to refresh token...")
+    func refreshToken() async throws -> String {
+        print("PrivyService: Attempting to refresh token...")
         
         // First check if we're already authenticated
         guard case .authenticated = authState else {
-            print("Not authenticated, cannot refresh token")
+            print("PrivyService: Not authenticated, cannot refresh token")
             throw APIError.notAuthenticated
         }
         
-        do {
-            // Re-initialize the SDK to force a new token
-            let config = PrivyConfig(appId: Config.privyAppId, appClientId: Config.privyClientId)
-            privy = PrivySdk.initialize(config: config)
-            
-            // Wait for the new auth state with timeout
-            let startTime = Date()
-            while Date().timeIntervalSince(startTime) < 5.0 { // 5 second timeout
-                if case .authenticated(let session) = authState {
-                    self.accessToken = session.authToken
-                    print("Successfully refreshed token: \(session.authToken)")
-                    
-                    // Force a balance refresh after token update
-                    await fetchBalance()
-                    return
-                }
-                try await Task.sleep(nanoseconds: 500_000_000) // 500ms
+        // Re-initialize the SDK to force a new auth state
+        let config = PrivyConfig(appId: Config.privyAppId, appClientId: Config.privyClientId)
+        privy = PrivySdk.initialize(config: config)
+        
+        // Wait for new token with timeout
+        let startTime = Date()
+        while Date().timeIntervalSince(startTime) < 5.0 { // 5 second timeout
+            if let token = self.accessToken {
+                print("PrivyService: Successfully refreshed token")
+                return token
             }
-            
-            print("Token refresh timed out")
-            throw APIError.tokenExpired
-        } catch {
-            print("Failed to refresh token: \(error)")
-            // If refresh fails, log out the user
-            try await logout()
-            throw APIError.tokenExpired
+            try await Task.sleep(nanoseconds: 500_000_000) // 500ms
         }
+        
+        print("PrivyService: Token refresh timed out")
+        throw APIError.tokenExpired
     }
 }
