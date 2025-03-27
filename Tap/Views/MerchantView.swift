@@ -11,6 +11,7 @@ import Combine
 // Add this at the top of the file, after the imports
 extension Notification.Name {
     static let dismissFriendPicker = Notification.Name("dismissFriendPicker")
+    static let showPaymentResponse = Notification.Name("showPaymentResponse")
 }
 
 struct MerchantView: View {
@@ -25,6 +26,8 @@ struct MerchantView: View {
     @Environment(\.colorScheme) var colorScheme
     
     @State private var showingRequestFormForFriend = false
+    @State private var showingPaymentResponse = false
+    @State private var paymentResponseMessage: String = ""
     
     // Initialize with existing parameters to avoid breaking changes
     init(showingRequestForm: Binding<Bool>, 
@@ -47,26 +50,51 @@ struct MerchantView: View {
     private var surfaceColor: Color { colorScheme == .dark ? Color.black.opacity(0.3) : Color.gray.opacity(0.1) }
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // BLE Discovery section
-                if let bleService = bleService {
-                    discoverySection(bleService: bleService)
+        ZStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    // BLE Discovery section
+                    if let bleService = bleService {
+                        discoverySection(bleService: bleService)
+                    }
+                    
+                    // Main action cards
+                    actionCardsSection
+                    
+                    // Recent requests using new view
+                    RecentRequestsView(viewModel: viewModel)
+                    
+                    // Add a spacer that takes up remaining space when payment card is shown
+                    if bleService?.receivedMessage != nil {
+                        Spacer()
+                            .frame(height: UIScreen.main.bounds.height / 3) // Adjust this value to control vertical position
+                    }
                 }
-                
-                // Main action cards
-                actionCardsSection
-                
-                // Recent requests using new view
-                RecentRequestsView(viewModel: viewModel)
-                
-                // Add a spacer that takes up remaining space when payment card is shown
-                if bleService?.receivedMessage != nil {
-                    Spacer()
-                        .frame(height: UIScreen.main.bounds.height / 3) // Adjust this value to control vertical position
+                .padding(.horizontal)
+            }
+            
+            // Payment Response Card overlay
+            if showingPaymentResponse {
+                PaymentResponseCard(message: paymentResponseMessage)
+                    .padding(.horizontal)
+                    .padding(.bottom, UIScreen.main.bounds.height / 4) // Positions card ~1/4 up from bottom
+                    .transition(.opacity)
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                            withAnimation {
+                                showingPaymentResponse = false
+                            }
+                        }
+                    }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showPaymentResponse)) { notification in
+            if let message = notification.userInfo?["message"] as? String {
+                withAnimation {
+                    paymentResponseMessage = message
+                    showingPaymentResponse = true
                 }
             }
-            .padding(.horizontal)
         }
         .sheet(isPresented: $viewModel.showingFriendPicker) {
             NavigationStack(path: $viewModel.navigationPath) {
