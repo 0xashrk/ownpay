@@ -497,14 +497,14 @@ struct SendMonForm: View {
                 
                 Task {
                     do {
-                        try await privyService.sendTransaction(amount: amountDouble, to: effectiveRecipientAddress)
+                        // Get the actual transaction hash from sendTransaction
+                        let transactionHash = try await privyService.sendTransaction(amount: amountDouble, to: effectiveRecipientAddress)
                         
-                        // Record the transaction
-                        let transactionHash = "0x" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+                        // Record the transaction with the real hash
                         recordTransaction(
                             amount: amountDouble,
                             recipient: effectiveRecipientAddress,
-                            hash: transactionHash
+                            hash: transactionHash  // Use the real transaction hash
                         )
                         
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
@@ -518,6 +518,7 @@ struct SendMonForm: View {
                         print("Error sending transaction: \(error)")
                         isSubmitting = false
                         showingConfirmation = false
+                        // You might want to show an error alert here
                     }
                 }
             }
