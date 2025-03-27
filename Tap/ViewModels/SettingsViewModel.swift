@@ -59,6 +59,8 @@ class SettingsViewModel: ObservableObject {
     @Published var isTestingApi = false
     @Published var apiTestError: String? = nil
     
+    @Published var navigationPath = NavigationPath()
+    
     let privyService: PrivyService
     let bleService: BLEService
     let userProfileService = UserProfileService.shared

@@ -37,8 +37,7 @@ struct WalletView: View {
     }
     
     var body: some View {
-        NavigationView {
-            
+        NavigationStack(path: $settingsViewModel.navigationPath) {
             ScrollView {
                 VStack(spacing: 20) {
                     // Wallet Address Section
@@ -128,11 +127,19 @@ struct WalletView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink {
-                        SettingsView(privyService: privyService, bleService: bleService, isLoggedIn: $isLoggedIn)
-                    } label: {
+                    NavigationLink(value: "settings") {
                         Image(systemName: "gear")
                     }
+                }
+            }
+            .navigationDestination(for: String.self) { destination in
+                switch destination {
+                case "settings":
+                    SettingsView(privyService: privyService, bleService: bleService, isLoggedIn: $isLoggedIn)
+                case "transactionHistory":
+                    TransactionHistoryView()
+                default:
+                    EmptyView()
                 }
             }
             .sheet(isPresented: $showingRequestForm) {
@@ -157,7 +164,6 @@ struct WalletView: View {
             }
             .onChange(of: settingsViewModel.selectedMode) { newValue in
                 print("Wallet View: Mode changed to \(newValue)")
-                // Stop existing scanning timer
                 scanTimer?.invalidate()
                 scanTimer = nil
                 
@@ -166,16 +172,12 @@ struct WalletView: View {
                 setupAutoScan()
             }
             .onAppear {
-                // Fetch balance with retry when view appears
                 fetchBalanceWithRetry()
-                
-                // Start automatic scanning when not in merchant mode
                 if settingsViewModel.selectedMode != .merchant {
                     setupAutoScan()
                 }
             }
             .onDisappear {
-                // Clean up when view disappears
                 scanTimer?.invalidate()
                 scanTimer = nil
                 bleService.disconnect()
@@ -195,6 +197,7 @@ struct WalletView: View {
                 }
             )
         }
+        .environmentObject(settingsViewModel)
         .onReceive(privyService.$authState) { state in
             if case .unauthenticated = state {
                 isLoggedIn = false

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @StateObject private var viewModel: SettingsViewModel
+    @EnvironmentObject var settingsViewModel: SettingsViewModel
     @Binding var isLoggedIn: Bool
     @Environment(\.dismiss) private var dismiss
     @State private var navigateToModes = false
@@ -98,9 +99,7 @@ struct SettingsView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 
-                NavigationLink {
-                    TransactionHistoryView()
-                } label: {
+                NavigationLink(value: "transactionHistory") {
                     Label("Transaction History", systemImage: "clock.arrow.circlepath")
                 }
             }
@@ -214,6 +213,8 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackground(Color(uiColor: .systemBackground), for: .navigationBar)
         .onAppear {
             // Initialize with current value
             localUsername = viewModel.userProfileService.storedUsername
@@ -262,21 +263,7 @@ struct SettingsView: View {
                 Text(error)
             }
         }
-        // Navigation to modes view
-        .background(
-            NavigationLink(destination: WalletModesView(viewModel: viewModel), isActive: $navigateToModes) {
-                EmptyView()
-            }
-            .hidden()
-        )
         .listStyle(PlainListStyle())
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text("Settings")
-                    .font(.headline)
-                    .foregroundColor(.white)
-            }
-        }
         .sheet(isPresented: $showingUsernameEditor) {
             UsernameEditorSheet { newUsername in
                 // Immediately update the local username for instant UI feedback
@@ -299,14 +286,14 @@ struct SettingsView: View {
 // Wallet modes selection view
 struct WalletModesView: View {
     @ObservedObject var viewModel: SettingsViewModel
-    @Environment(\.presentationMode) var presentationMode
+    @Environment(\.dismiss) var dismiss
     
     var body: some View {
         List {
             ForEach(WalletMode.allCases, id: \.self) { mode in
                 Button(action: {
                     viewModel.selectedMode = mode
-                    presentationMode.wrappedValue.dismiss()
+                    dismiss()
                 }) {
                     HStack {
                         Image(systemName: viewModel.iconForMode(mode))
@@ -327,6 +314,8 @@ struct WalletModesView: View {
             }
         }
         .navigationTitle("Select Wallet Mode")
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackground(Color(uiColor: .systemBackground), for: .navigationBar)
     }
 }
 
@@ -365,7 +354,7 @@ struct NetworkSettingsView: View {
 // TransactionHistoryView has been moved to its own file
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         SettingsView(
             privyService: PrivyService.shared,
             bleService: BLEService(),
