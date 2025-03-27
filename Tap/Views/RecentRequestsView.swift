@@ -191,8 +191,8 @@ struct RequestRow: View {
                 )
                 
                 // Create payment response message for the card
-                // Format: PAYMENT_RESPONSE:APPROVED:txHash:amount:senderAddress:recipientAddress:note
-                let responseMessage = "PAYMENT_RESPONSE:APPROVED:\(transactionHash):\(request.amount):\(PrivyService.shared.walletAddress ?? ""):\(requesterWallet):\(request.note ?? "")"
+                // Format: PAYMENT_RESPONSE:SENT:txHash:amount:senderAddress:recipientAddress:note
+                let responseMessage = "PAYMENT_RESPONSE:SENT:\(transactionHash):\(request.amount):\(PrivyService.shared.walletAddress ?? ""):\(requesterWallet):\(request.note ?? "")"
                 
                 await MainActor.run {
                     // Show payment response card through MerchantView
@@ -221,7 +221,7 @@ struct RequestRow: View {
                     print("Error paying request: \(error)")
                     
                     // Show error in payment response card
-                    let errorMessage = "PAYMENT_RESPONSE:DECLINED:error:\(request.amount):\(PrivyService.shared.walletAddress ?? ""):\(request.requester?.ethereumWallet ?? ""):\(error.localizedDescription)"
+                    let errorMessage = "PAYMENT_RESPONSE:FAILED:\(error.localizedDescription):\(request.amount):\(PrivyService.shared.walletAddress ?? ""):\(request.requester?.ethereumWallet ?? ""):\(request.note ?? "")"
                     NotificationCenter.default.post(
                         name: .showPaymentResponse,
                         object: nil,

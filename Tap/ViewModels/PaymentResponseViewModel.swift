@@ -10,11 +10,11 @@ class PaymentResponseViewModel: ObservableObject {
     }
     
     var isApproved: Bool {
-        components.count > 1 && components[1] == "APPROVED"
+        components.count > 1 && (components[1] == "APPROVED" || components[1] == "SENT")
     }
     
     var statusText: String {
-        isApproved ? "Payment Approved" : "Payment Declined"
+        isApproved ? "Payment Sent" : "Payment Declined"
     }
     
     var iconName: String {

@@ -122,16 +122,15 @@ final class PaymentTransaction {
     static func fromResponseMessage(_ message: String) -> PaymentTransaction {
         let components = message.split(separator: ":").map { String($0) }
         
-        let isApproved = components.count > 1 && components[1] == "APPROVED"
+        let isApproved = components.count > 1 && (components[1] == "APPROVED" || components[1] == "SENT")
         let transactionHash = components.count > 2 ? components[2] : nil
         let amount = components.count > 3 ? components[3] : nil
         let sender = components.count > 4 ? components[4] : nil
         let recipient = components.count > 5 ? components[5] : nil
         let note = components.count > 6 ? components[6] : nil
         
-        // Determine if this is a sent or received transaction
-        // This is a simplification - you might need more logic based on your app
-        let type: TransactionType = .received
+        // Determine type based on whether we're the sender
+        let type: TransactionType = (sender == PrivyService.shared.walletAddress) ? .sent : .received
         
         return PaymentTransaction(
             isApproved: isApproved,
