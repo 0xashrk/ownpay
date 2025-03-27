@@ -138,6 +138,8 @@ struct WalletView: View {
                     SettingsView(privyService: privyService, bleService: bleService, isLoggedIn: $isLoggedIn)
                 case "transactionHistory":
                     TransactionHistoryView()
+                case "walletModes":
+                    WalletModesView(viewModel: settingsViewModel)
                 default:
                     EmptyView()
                 }

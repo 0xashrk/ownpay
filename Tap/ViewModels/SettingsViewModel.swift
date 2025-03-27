@@ -187,4 +187,14 @@ class SettingsViewModel: ObservableObject {
         isPasswordVerified = false
         passwordError = false
     }
+    
+    func navigateToWalletModes() {
+        navigationPath.append("walletModes")
+    }
+    
+    func dismissWalletModes() {
+        if !navigationPath.isEmpty {
+            navigationPath.removeLast()
+        }
+    }
 } 
