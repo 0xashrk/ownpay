@@ -225,28 +225,31 @@ class APIService {
                 throw APIError.invalidResponse
             }
             
+            // Print response for debugging
+            print("API Response Status: \(httpResponse.statusCode)")
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("API Response Body: \(responseString)")
+            }
+            
             switch httpResponse.statusCode {
             case 200...299:
                 do {
                     return try JSONDecoder().decode(T.self, from: data)
                 } catch {
                     print("API: Decoding error: \(error)")
-                    print("API: Response data: \(String(data: data, encoding: .utf8) ?? "Invalid data")")
                     throw APIError.decodingFailed(error)
                 }
                 
             case 401, 403:
-                // Check if it's a token expiration
-                if let responseString = String(data: data, encoding: .utf8),
-                   responseString.contains("Token has expired") {
+                // Try to refresh token for any 401/403 error if we haven't exceeded retries
+                if retry < maxRetries {
+                    print("API: Authorization failed, attempting token refresh...")
                     
-                    if retry < maxRetries {
-                        print("API: Token expired, attempting refresh...")
+                    do {
+                        // Try to get new token
+                        _ = try await PrivyService.shared.refreshToken()
+                        print("API: Token refreshed successfully, retrying request...")
                         
-                        // Get new token from PrivyService
-                        let newToken = try await PrivyService.shared.refreshToken()
-                        
-                        print("API: Got new token, retrying request...")
                         // Retry the request with new token
                         return try await performRequest(
                             path: path,
@@ -256,8 +259,13 @@ class APIService {
                             retry: retry + 1,
                             maxRetries: maxRetries
                         )
+                    } catch {
+                        print("API: Token refresh failed: \(error)")
+                        throw APIError.tokenExpired
                     }
                 }
+                
+                // If we've exceeded retries or refresh failed, throw unauthorized
                 throw APIError.unauthorized
                 
             default:
