@@ -77,7 +77,6 @@ struct MerchantView: View {
             if showingPaymentResponse {
                 PaymentResponseCard(message: paymentResponseMessage)
                     .padding(.horizontal)
-                    .padding(.bottom, UIScreen.main.bounds.height / 4) // Positions card ~1/4 up from bottom
                     .transition(.opacity)
                     .onAppear {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
