@@ -135,24 +135,19 @@ class SettingsViewModel: ObservableObject {
     // MARK: - API Connection Test
     
     func testApiConnection() {
-        // Reset state
-        apiTestResult = nil
-        apiTestError = nil
-        isTestingApi = true
-        
-        Task {
+        // Reset state on main thread
+        Task { @MainActor in
+            apiTestResult = nil
+            apiTestError = nil
+            isTestingApi = true
+            
             do {
                 let result = try await APIService.shared.testApiConnection()
-                
-                await MainActor.run {
-                    self.apiTestResult = "Success: \(result.message)"
-                    self.isTestingApi = false
-                }
+                self.apiTestResult = "Success: \(result.message)"
+                self.isTestingApi = false
             } catch {
-                await MainActor.run {
-                    self.apiTestError = "Error: \(error.localizedDescription)"
-                    self.isTestingApi = false
-                }
+                self.apiTestError = "Error: \(error.localizedDescription)"
+                self.isTestingApi = false
             }
         }
     }
