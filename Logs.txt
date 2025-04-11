@@ -1,0 +1,3 @@
+History of communication with Apple AppStore Connect
+
+Regarding our guideline 2.2, since the product is advertised to operate on a blockchain that's not on mainnet, i.e. Monad blockchain, and utilises unreleased token (i.e. MON), we deemed the app to be in a demo version at this time.
