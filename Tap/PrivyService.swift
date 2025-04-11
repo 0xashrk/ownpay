@@ -493,11 +493,30 @@ class PrivyService: ObservableObject {
             let txHash = try await sendRawTransaction(signedTx: signedTxString)
             print("Transaction submitted with hash: \(txHash)")
             
-            // Wait for transaction confirmation
-            try await Task.sleep(nanoseconds: 3 * 1_000_000_000) // 3 seconds
-            await fetchBalance()
+            // Initialize transaction verifier
+            let verifier = TransactionVerifier(rpcURL: monadRPCURL)
             
-            return txHash // Return the actual transaction hash
+            // Verify the transaction
+            do {
+                let isVerified = try await verifier.verifyTransaction(
+                    txHash: txHash,
+                    senderAddress: wallet.address,
+                    recipientAddress: recipientAddress,
+                    expectedAmount: amountInWei
+                )
+                
+                if isVerified {
+                    print("Transaction verified successfully")
+                    await fetchBalance()
+                } else {
+                    throw WalletError.transactionFailed
+                }
+            } catch {
+                print("Transaction verification failed: \(error)")
+                throw WalletError.transactionFailed
+            }
+            
+            return txHash // Return the transaction hash after successful verification
         } catch {
             print("Error sending transaction: \(error)")
             throw error
