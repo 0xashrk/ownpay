@@ -1,0 +1,5 @@
+enum Config {
+    static let privyAppId = "YOUR_PRIVY_APP_ID_HERE"
+    
+    // Add other environment variables here
+}

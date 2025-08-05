@@ -54,8 +54,18 @@ Own Pay is a mobile cryptocurrency payment application that enables fast, secure
 
 ### Installation
 1. Clone the repository
-2. Open the project in Xcode
-3. Build and run on your iOS device
+2. Copy the config template:
+   ```bash
+   cp Config.swift.example Config.swift
+   ```
+3. Edit `Config.swift` and add your Privy App ID:
+   ```swift
+   enum Config {
+       static let privyAppId = "YOUR_PRIVY_APP_ID_HERE"
+   }
+   ```
+4. Open the project in Xcode
+5. Build and run on your iOS device
 
 ## Usage Scenarios
 
