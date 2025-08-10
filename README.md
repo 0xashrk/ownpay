@@ -19,7 +19,7 @@
 
 ![OwnPay Origin Story](my-win-qoute-post.png)
 
-> "Built this straight after landing in NYC from EthDenver and was basically bothered by [this](https://x.com/base/status/18...) and its inefficient ways of merchants accepting payments" - [@0xashrk](https://twitter.com/0xashrk)
+> "Built this straight after landing in NYC from EthDenver and was basically bothered by [this](https://x.com/base/status/1895938456041423003) and its inefficient ways of merchants accepting payments" - [@0xashrk](https://twitter.com/0xashrk)
 
 After witnessing Base network's approach at EthDenver - where food truck merchants had to get customers to scan wallet address barcodes - we knew there had to be a better way. Coming from London where Apple Pay's tap-to-pay experience is ubiquitous, the idea of holding up barcodes felt like a step backward. While QR codes work in Asia, they're cumbersome and potentially insecure when printed on paper.
 
